@@ -785,11 +785,11 @@ function openTripForm(trip = null) {
       </div>
       <div class="form-group">
         <label class="form-label">Дата начала</label>
-        <input class="form-input" id="trip-start" type="date" value="${trip?.start_date || ''}" />
+        <input class="form-input" id="trip-start" type="text" value="${escHtml(trip?.start_date ? formatDate(trip.start_date) : '')}" />
       </div>
       <div class="form-group">
         <label class="form-label">Дата окончания</label>
-        <input class="form-input" id="trip-end" type="date" value="${trip?.end_date || ''}" />
+        <input class="form-input" id="trip-end" type="text" value="${escHtml(trip?.end_date ? formatDate(trip.end_date) : '')}" />
       </div>
       <div class="form-group">
         <label class="form-label">Заметка</label>
@@ -797,6 +797,10 @@ function openTripForm(trip = null) {
       </div>
     `;
     sheet.appendChild(body);
+
+    // Date pickers
+    applyDateMask(qs('#trip-start', body));
+    applyDateMask(qs('#trip-end', body));
 
     // Location autocomplete
     initLocationAutocomplete(
@@ -825,8 +829,8 @@ function openTripForm(trip = null) {
       const payload = {
         title,
         locations: qs('#trip-locations').value.trim() || null,
-        start_date: qs('#trip-start').value || null,
-        end_date:   qs('#trip-end').value || null,
+        start_date: toIsoDate(qs('#trip-start').value.trim()) || null,
+        end_date:   toIsoDate(qs('#trip-end').value.trim()) || null,
         note:       qs('#trip-note').value.trim() || null,
       };
       try {
