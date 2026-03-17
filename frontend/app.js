@@ -1627,52 +1627,60 @@ function renderEventsList(container) {
 
   let events = State.calEvents;
   if (State.calSelectedDay) {
-    events = events.filter(e => e.date === State.calSelectedDay || e.end_date >= State.calSelectedDay);
+    events = events.filter(e => {
+      const s = e.date || '';
+      const en = e.end_date || e.date || '';
+      return s <= State.calSelectedDay && State.calSelectedDay <= en;
+    });
   }
 
   if (!events.length) {
     if (State.calSelectedDay) {
-      const empty = el('div', '', `<div style="text-align:center;color:var(--text-hint);padding:20px;font-size:14px">Нет событий ${formatDateShort(State.calSelectedDay)}</div>`);
-      list.appendChild(empty);
+      list.innerHTML = `<div style="text-align:center;color:var(--text-hint);padding:20px;font-size:14px">Нет событий ${formatDateShort(State.calSelectedDay)}</div>`;
     }
     container.appendChild(list);
     return;
   }
 
-  if (State.calSelectedDay) {
-    const title = el('div', 'section-title', formatDate(State.calSelectedDay));
-    list.appendChild(title);
-  } else {
-    const title = el('div', 'section-title', 'Все события месяца');
-    list.appendChild(title);
-  }
-
-  const eventColors = {
-    trip: '#007aff',
-    FLIGHT_TICKET: '#007aff',
-    HOTEL_BOOKING: '#34c759',
-    TRAIN_TICKET: '#ff9500',
-    BUS_TICKET: '#ff6b35',
-    CAR_RENTAL: '#af52de',
-    MEDICAL_INSURANCE: '#ff2d55',
-    PASSPORT: '#5ac8fa',
-  };
+  const title = el('div', 'section-title', State.calSelectedDay ? formatDate(State.calSelectedDay) : 'Все события месяца');
+  list.appendChild(title);
 
   events.forEach(ev => {
     const item = el('div', 'event-item');
-    const color = ev.kind === 'trip' ? eventColors.trip : (eventColors[ev.doc_type] || '#8e8e93');
-    item.innerHTML = `
-      <div class="event-dot" style="background:${color}"></div>
-      <div class="event-info">
-        <div class="event-title">${escHtml(ev.title)}</div>
-        ${ev.subtitle ? `<div class="event-sub">${escHtml(ev.subtitle)}</div>` : ''}
-        <div class="event-sub">
-          ${ev.date ? formatDateShort(ev.date) : ''}
-          ${ev.end_date && ev.end_date !== ev.date ? ` — ${formatDateShort(ev.end_date)}` : ''}
+
+    if (ev.kind === 'trip') {
+      // Карточка поездки
+      const trip = State.trips.find(t => t.id === ev.trip_id);
+      item.innerHTML = `
+        <div class="event-type-badge" style="background:var(--accent)">🗺</div>
+        <div class="event-info">
+          <div class="event-title">${escHtml(ev.title)}</div>
+          ${trip?.locations ? `<div class="event-sub">📍 ${escHtml(trip.locations)}</div>` : ''}
+          <div class="event-sub">
+            ${ev.date ? formatDateShort(ev.date) : ''}${ev.end_date && ev.end_date !== ev.date ? ` — ${formatDateShort(ev.end_date)}` : ''}
+          </div>
         </div>
-      </div>
-    `;
-    if (ev.doc_id) item.onclick = () => openDocDetail(ev.doc_id);
+        <div class="event-arrow">›</div>
+      `;
+      if (trip) item.onclick = () => openTripDetail(trip);
+
+    } else {
+      // Карточка документа
+      const info = getDocInfo(ev.doc_type);
+      const dateStr = ev.date ? formatDateShort(ev.date) : '';
+      const endStr  = ev.end_date && ev.end_date !== ev.date ? ` — ${formatDateShort(ev.end_date)}` : '';
+      item.innerHTML = `
+        <div class="event-type-badge ${info.color}">${info.icon}</div>
+        <div class="event-info">
+          <div class="event-title">${escHtml(ev.title)}</div>
+          ${ev.subtitle ? `<div class="event-sub">${escHtml(ev.subtitle)}</div>` : ''}
+          <div class="event-sub">${dateStr}${endStr}</div>
+        </div>
+        <div class="event-arrow">›</div>
+      `;
+      item.onclick = () => openDocDetail(ev.doc_id);
+    }
+
     list.appendChild(item);
   });
 
