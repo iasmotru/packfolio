@@ -1508,12 +1508,12 @@ async function renderCalendarPage() {
   qs('#page-title').textContent = 'Календарь';
   qs('#fab').classList.add('hidden');
 
-  try {
-    const data = await API.get(`/api/calendar?month=${State.calMonth}`);
-    State.calEvents = data.events || [];
-  } catch (e) {
-    State.calEvents = [];
-  }
+  // Обновляем поездки и события параллельно
+  const [calData] = await Promise.all([
+    API.get(`/api/calendar?month=${State.calMonth}`).catch(() => ({ events: [] })),
+    API.get('/api/trips').then(t => { if (t) State.trips = t; }).catch(() => {}),
+  ]);
+  State.calEvents = calData?.events || [];
 
   renderCalendarGrid(c);
   renderEventsList(c);
