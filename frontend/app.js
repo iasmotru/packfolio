@@ -429,7 +429,139 @@ function applyDateMask(input) {
   });
 }
 
-/// Автомаска ввода даты+времени (dd.mm.yy hh:mm) + пикер
+// ── Барабан для выбора числа (часы / минуты) ───
+
+function createDrumCol(min, max, initial, onChange) {
+  const H = 44; // высота одного элемента
+  const HALF = 2 * H; // отступ = 2 элемента, чтобы первый/последний были по центру
+
+  const col = document.createElement('div');
+  col.className = 'tp-drum-col';
+
+  // Верхний отступ
+  const padT = document.createElement('div');
+  padT.style.height = HALF + 'px';
+  col.appendChild(padT);
+
+  for (let v = min; v <= max; v++) {
+    const item = document.createElement('div');
+    item.className = 'tp-drum-item';
+    item.textContent = String(v).padStart(2, '0');
+    item.dataset.v = v;
+    col.appendChild(item);
+  }
+
+  // Нижний отступ
+  const padB = document.createElement('div');
+  padB.style.height = HALF + 'px';
+  col.appendChild(padB);
+
+  const items = () => [...col.querySelectorAll('.tp-drum-item')];
+
+  const highlightCenter = () => {
+    const idx = Math.round(col.scrollTop / H);
+    items().forEach((it, i) => it.classList.toggle('tp-center', i === idx));
+  };
+
+  // Установить начальное значение
+  requestAnimationFrame(() => {
+    col.scrollTop = (initial - min) * H;
+    highlightCenter();
+  });
+
+  // Клик по элементу — прокрутить к нему
+  col.addEventListener('mousedown', e => {
+    const item = e.target.closest('.tp-drum-item[data-v]');
+    if (!item) return;
+    e.preventDefault();
+    const v = parseInt(item.dataset.v);
+    col.scrollTo({ top: (v - min) * H, behavior: 'smooth' });
+    onChange(v);
+  });
+  col.addEventListener('touchend', e => {
+    const item = e.target.closest('.tp-drum-item[data-v]');
+    if (item) { e.preventDefault(); }
+  });
+
+  let scrollTimer;
+  col.addEventListener('scroll', () => {
+    highlightCenter();
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      const v = Math.max(min, Math.min(max, Math.round(col.scrollTop / H) + min));
+      col.scrollTo({ top: (v - min) * H, behavior: 'smooth' });
+      onChange(v);
+    }, 120);
+  }, { passive: true });
+
+  return col;
+}
+
+// ── Пикер времени (барабан часов и минут) ───────
+
+function createTimePicker(anchorEl, initialTime, onSelect) {
+  let hh = 12, mm = 0;
+  if (initialTime) {
+    const p = initialTime.split(':');
+    const ph = parseInt(p[0]), pm = parseInt(p[1]);
+    if (!isNaN(ph)) hh = ph;
+    if (!isNaN(pm)) mm = pm;
+  }
+
+  const popup = document.createElement('div');
+  popup.className = 'timepicker-popup';
+  popup.addEventListener('mousedown', e => e.preventDefault());
+  popup.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'tp-title';
+  const updateTitle = () => {
+    titleEl.textContent = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+  };
+  updateTitle();
+  popup.appendChild(titleEl);
+
+  const drumRow = document.createElement('div');
+  drumRow.className = 'tp-drum-row';
+
+  const hoursCol = createDrumCol(0, 23, hh, v => { hh = v; updateTitle(); });
+  const sep = document.createElement('div');
+  sep.className = 'tp-sep';
+  sep.textContent = ':';
+  const minsCol = createDrumCol(0, 59, mm, v => { mm = v; updateTitle(); });
+
+  drumRow.appendChild(hoursCol);
+  drumRow.appendChild(sep);
+  drumRow.appendChild(minsCol);
+  popup.appendChild(drumRow);
+
+  const doneBtn = document.createElement('button');
+  doneBtn.className = 'btn btn-primary tp-done';
+  doneBtn.textContent = 'Готово';
+  const confirm = () => {
+    onSelect(`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
+    destroy();
+  };
+  doneBtn.addEventListener('mousedown', e => { e.preventDefault(); confirm(); });
+  doneBtn.addEventListener('touchend',  e => { e.preventDefault(); confirm(); });
+  popup.appendChild(doneBtn);
+
+  // Позиционирование — такое же как у datepicker
+  const r = anchorEl.getBoundingClientRect();
+  popup.style.position = 'fixed';
+  popup.style.left = Math.min(r.left, window.innerWidth - 290) + 'px';
+  if (window.innerHeight - r.bottom - 8 >= 310) {
+    popup.style.top = (r.bottom + 4) + 'px';
+  } else {
+    popup.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+  }
+
+  document.body.appendChild(popup);
+  const destroy = () => popup.remove();
+  return { destroy };
+}
+
+// Автомаска ввода даты+времени (dd.mm.yy hh:mm) + пикер даты → барабан времени
 function applyDatetimeMask(input) {
   input.placeholder = 'дд.мм.гг чч:мм';
   input.maxLength = 14;
@@ -444,7 +576,7 @@ function applyDatetimeMask(input) {
     else if (digits.length > 2) m = `${digits.slice(0,2)}.${digits.slice(2)}`;
     else m = digits;
     input.value = m;
-    if (picker && digits.length >= 6) picker.highlight(toIsoDate(m.slice(0, 8)));
+    if (picker && digits.length >= 6) picker.highlight?.(toIsoDate(m.slice(0, 8)));
   });
 
   input.addEventListener('focus', () => {
@@ -452,11 +584,13 @@ function applyDatetimeMask(input) {
     picker = createDatePicker(input, isoDate => {
       const [y, mo, d] = isoDate.split('-');
       const datePart = `${d}.${mo}.${y.slice(-2)}`;
-      // Сохранить существующее время, если уже введено
       const existingTime = input.value.match(/\s(\d{2}:\d{2})$/)?.[1];
-      input.value = existingTime ? `${datePart} ${existingTime}` : `${datePart} `;
-      picker = null;
-      // Не вызываем blur — пользователь вводит время дальше
+      // picker уже уничтожен внутри createDatePicker (destroy() после onSelect)
+      picker = createTimePicker(input, existingTime || null, time => {
+        input.value = `${datePart} ${time}`;
+        picker = null;
+        input.blur(); // триггер сохранения
+      });
     });
   });
 
