@@ -880,8 +880,8 @@ function buildCardFieldItem(doc, key) {
 
     valueEl.style.display = 'none';
     const input = el('input', 'card-inline-input');
-    // Показываем в поле ввода уже отформатированное значение
-    input.value = displayed || '';
+    // Показываем в поле ввода уже отформатированное значение (актуальное)
+    input.value = displayFieldValue(key, val) || '';
     if (DATE_FIELDS.has(key)) applyDateMask(input);
     else if (TIME_FIELDS.has(key)) applyTimeMask(input);
     else input.placeholder = WIDGET_LABELS[key] || key;
@@ -1208,32 +1208,34 @@ function buildWidgetFieldRow(key, val, onSave) {
     valEl.style.display = 'none';
 
     const input = el('input', 'inline-edit-input');
-    input.value = displayed || '';
+    input.value = displayFieldValue(key, val) || '';
     if (DATE_FIELDS.has(key)) applyDateMask(input);
     else if (TIME_FIELDS.has(key)) applyTimeMask(input);
     else input.placeholder = WIDGET_LABELS[key] || key;
     row.appendChild(input);
 
+    let saved = false;
     const saveInline = async () => {
+      if (saved) return;
+      saved = true;
       const raw = input.value.trim();
       const newVal = DATE_FIELDS.has(key) ? toIsoDate(raw) : raw;
-      await onSave(newVal);
-      val = newVal;
-      const newDisplayed = displayFieldValue(key, newVal);
-      valEl.textContent = newDisplayed || 'не заполнено';
-      valEl.className = `widget-field-val${!newDisplayed ? ' empty' : ''}`;
-      input.remove();
-      editBtn.style.display = '';
-      valEl.style.display = '';
-    };
-
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') saveInline();
-      if (e.key === 'Escape') {
+      try {
+        await onSave(newVal);
+        val = newVal;
+        const newDisplayed = displayFieldValue(key, newVal);
+        valEl.textContent = newDisplayed || 'не заполнено';
+        valEl.className = `widget-field-val${!newDisplayed ? ' empty' : ''}`;
+      } finally {
         input.remove();
         editBtn.style.display = '';
         valEl.style.display = '';
       }
+    };
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); saveInline(); }
+      if (e.key === 'Escape') { saved = true; input.remove(); editBtn.style.display = ''; valEl.style.display = ''; }
     });
     input.addEventListener('blur', saveInline);
     input.focus();
