@@ -1198,6 +1198,92 @@ html, body {
 .divider { height: 1px; background: var(--border); margin: 0 var(--gap); }
 
 /* ──────────────────────────────────────────────
+   Date Picker Popup
+   ────────────────────────────────────────────── */
+
+.datepicker-popup {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.55);
+  width: 272px;
+  user-select: none;
+}
+
+.dp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.dp-nav {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dp-nav:hover { background: var(--bg-elevated); }
+
+.dp-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  flex: 1;
+}
+
+.dp-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.dp-weekday {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-hint);
+  padding: 2px 0;
+}
+
+.dp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.dp-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
+}
+.dp-cell:not(.dp-empty):hover { background: var(--bg-elevated); }
+.dp-cell.dp-empty { pointer-events: none; }
+.dp-cell.dp-today { color: var(--accent); font-weight: 600; }
+.dp-cell.dp-selected {
+  background: var(--accent);
+  color: #fff !important;
+  font-weight: 600;
+}
+
+/* ──────────────────────────────────────────────
    Responsive
    ────────────────────────────────────────────── */
 @media (min-width: 430px) {

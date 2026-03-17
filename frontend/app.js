@@ -256,22 +256,143 @@ function toIsoDate(str) {
   return s;
 }
 
-// Автомаска ввода даты (dd.mm.yy)
+// ── Всплывающий пикер дат ──────────────────────
+
+const DP_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+  'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const DP_DAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+function createDatePicker(anchorEl, onSelect) {
+  const isoInit = toIsoDate(anchorEl.value);
+  const today = new Date();
+  let selDate = (isoInit && isoInit.match(/^\d{4}-\d{2}-\d{2}/)) ? isoInit.slice(0, 10) : null;
+  let viewYear  = selDate ? +selDate.slice(0, 4) : today.getFullYear();
+  let viewMonth = selDate ? +selDate.slice(5, 7) - 1 : today.getMonth();
+
+  const popup = el('div', 'datepicker-popup');
+  // Prevent any click inside popup from blurring the input
+  popup.addEventListener('mousedown', e => e.preventDefault());
+  popup.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+
+  const render = () => {
+    popup.innerHTML = '';
+
+    // Header
+    const header = el('div', 'dp-header');
+    const prevBtn = el('button', 'dp-nav', '&#8249;');
+    prevBtn.type = 'button';
+    prevBtn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      if (--viewMonth < 0) { viewMonth = 11; viewYear--; }
+      render();
+    });
+    const nextBtn = el('button', 'dp-nav', '&#8250;');
+    nextBtn.type = 'button';
+    nextBtn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      if (++viewMonth > 11) { viewMonth = 0; viewYear++; }
+      render();
+    });
+    const title = el('div', 'dp-title', `${DP_MONTHS[viewMonth]} ${viewYear}`);
+    header.appendChild(prevBtn);
+    header.appendChild(title);
+    header.appendChild(nextBtn);
+    popup.appendChild(header);
+
+    // Weekday names
+    const weekdays = el('div', 'dp-weekdays');
+    DP_DAYS.forEach(d => weekdays.appendChild(el('div', 'dp-weekday', d)));
+    popup.appendChild(weekdays);
+
+    // Days grid
+    const grid = el('div', 'dp-grid');
+    const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+    const offset = (firstDow + 6) % 7; // Monday-start
+    const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+    for (let i = 0; i < offset; i++) grid.appendChild(el('div', 'dp-cell dp-empty'));
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = `${viewYear}-${String(viewMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const cell = el('div', 'dp-cell', String(d));
+      if (iso === selDate) cell.classList.add('dp-selected');
+      if (viewYear === today.getFullYear() && viewMonth === today.getMonth() && d === today.getDate())
+        cell.classList.add('dp-today');
+
+      cell.addEventListener('mousedown', e => {
+        e.preventDefault();
+        selDate = iso;
+        onSelect(iso);   // caller sets input.value and calls input.blur()
+        destroy();
+      });
+      // Touch support
+      cell.addEventListener('touchend', e => {
+        e.preventDefault();
+        selDate = iso;
+        onSelect(iso);
+        destroy();
+      });
+      grid.appendChild(cell);
+    }
+    popup.appendChild(grid);
+  };
+
+  const position = () => {
+    const r = anchorEl.getBoundingClientRect();
+    popup.style.left = Math.min(r.left, window.innerWidth - 280) + 'px';
+    const spaceBelow = window.innerHeight - r.bottom - 8;
+    if (spaceBelow >= 280) {
+      popup.style.top = (r.bottom + 4) + 'px';
+      popup.style.bottom = '';
+    } else {
+      popup.style.top = '';
+      popup.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+    }
+  };
+
+  const destroy = () => popup.remove();
+
+  render();
+  document.body.appendChild(popup);
+  position();
+
+  return { destroy, highlight: (isoDate) => { selDate = isoDate; render(); } };
+}
+
+// Автомаска ввода даты (dd.mm.yy) + пикер
 function applyDateMask(input) {
   input.placeholder = 'дд.мм.гг';
   input.maxLength = 8;
-  input.addEventListener('input', (e) => {
-    const sel = input.selectionStart;
+  let picker = null;
+
+  input.addEventListener('input', () => {
     let digits = input.value.replace(/\D/g, '').slice(0, 6);
     let masked = '';
     if (digits.length > 4) masked = digits.slice(0,2) + '.' + digits.slice(2,4) + '.' + digits.slice(4);
     else if (digits.length > 2) masked = digits.slice(0,2) + '.' + digits.slice(2);
     else masked = digits;
     input.value = masked;
+    // Sync picker highlight when full date typed
+    if (picker && digits.length === 6) picker.highlight(toIsoDate(masked));
+  });
+
+  input.addEventListener('focus', () => {
+    if (picker) return;
+    picker = createDatePicker(input, isoDate => {
+      const [y, m, d] = isoDate.split('-');
+      input.value = `${d}.${m}.${y.slice(-2)}`;
+      picker = null;
+      input.blur();   // triggers save
+    });
+  });
+
+  // Close picker when input blurs (e.g. user taps outside)
+  input.addEventListener('blur', () => {
+    if (picker) { picker.destroy(); picker = null; }
   });
 }
 
-// Автомаска ввода времени (hh:mm)
+/// Автомаска ввода времени (hh:mm)
 function applyTimeMask(input) {
   input.placeholder = 'чч:мм';
   input.maxLength = 5;
