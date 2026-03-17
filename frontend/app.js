@@ -371,6 +371,11 @@ function createDatePicker(anchorEl, onSelect) {
       });
       grid.appendChild(cell);
     }
+
+    // Всегда 6 строк (42 ячейки) — фиксированный размер на любой месяц
+    const total = offset + daysInMonth;
+    for (let i = total; i < 42; i++) grid.appendChild(el('div', 'dp-cell dp-empty'));
+
     popup.appendChild(grid);
   };
 
