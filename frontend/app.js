@@ -201,9 +201,9 @@ const WIDGET_LABELS = {
   seat:              'Место',
   departure_place:   'Откуда',
   arrival_place:     'Куда',
-  departure_date:    'Дата вылета',
+  departure_date:    'Отправление',
   departure_time:    'Время вылета',
-  arrival_date:      'Дата прибытия',
+  arrival_date:      'Прибытие',
   arrival_time:      'Время прибытия',
   baggage:           'Багаж',
   tariff:            'Тариф / класс',
@@ -227,19 +227,56 @@ const WIDGET_LABELS = {
 
 // Типы полей для форматирования
 const DATE_FIELDS = new Set([
-  'check_in','check_out','departure_date','arrival_date',
+  'check_in','check_out',
   'pickup_date','dropoff_date','start_date','end_date',
   'date_of_birth','expiry_date',
 ]);
 const TIME_FIELDS = new Set([
   'departure_time','arrival_time','pickup_time','dropoff_time',
 ]);
+// departure_date / arrival_date хранят дату и время вместе
+const DATETIME_FIELDS_MAP = {
+  departure_date: 'departure_time',
+  arrival_date:   'arrival_time',
+};
+const DATETIME_FIELDS = new Set(Object.keys(DATETIME_FIELDS_MAP));
+
+// "YYYY-MM-DD[ HH:MM]" → "dd.mm.yy hh:mm" (время опционально)
+function formatDatetime(dateStr, timeStr) {
+  if (!dateStr) return null;
+  const d = formatDate(dateStr);
+  if (!d || d === '—') return null;
+  // время может быть внутри dateStr ("YYYY-MM-DD HH:MM") или отдельно
+  const inlineTime = String(dateStr).match(/[T ](\d{2}:\d{2})/)?.[1];
+  const t = inlineTime || timeStr || null;
+  return t ? `${d} ${t}` : d;
+}
+
+// "dd.mm.yy hh:mm" → ["YYYY-MM-DD", "HH:MM"] (время может быть null)
+function parseIsoDatetime(str) {
+  if (!str) return [null, null];
+  const s = str.trim();
+  const m2 = s.match(/^(\d{2})\.(\d{2})\.(\d{2})\s+(\d{2}):(\d{2})$/);
+  if (m2) return [`20${m2[3]}-${m2[2]}-${m2[1]}`, `${m2[4]}:${m2[5]}`];
+  const m4 = s.match(/^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2})$/);
+  if (m4) return [`${m4[3]}-${m4[2]}-${m4[1]}`, `${m4[4]}:${m4[5]}`];
+  return [toIsoDate(s), null];
+}
 
 // Отображение значения поля с учётом типа
-function displayFieldValue(key, val) {
-  if (val === null || val === undefined || val === '') return null;
+// allData — опционально, для DATETIME_FIELDS (достать время из соседнего поля)
+function displayFieldValue(key, val, allData) {
+  if (val === null || val === undefined || val === '') {
+    // datetime: может быть пусто само поле, но есть время
+    if (DATETIME_FIELDS.has(key)) return null;
+    return null;
+  }
   const s = String(val);
-  if (DATE_FIELDS.has(key)) return formatDate(s);   // → dd.mm.yy
+  if (DATETIME_FIELDS.has(key)) {
+    const timeKey = DATETIME_FIELDS_MAP[key];
+    return formatDatetime(s, allData?.[timeKey]);
+  }
+  if (DATE_FIELDS.has(key)) return formatDate(s);
   return s;
 }
 
@@ -392,7 +429,43 @@ function applyDateMask(input) {
   });
 }
 
-/// Автомаска ввода времени (hh:mm)
+/// Автомаска ввода даты+времени (dd.mm.yy hh:mm) + пикер
+function applyDatetimeMask(input) {
+  input.placeholder = 'дд.мм.гг чч:мм';
+  input.maxLength = 14;
+  let picker = null;
+
+  input.addEventListener('input', () => {
+    const digits = input.value.replace(/\D/g, '').slice(0, 10);
+    let m = '';
+    if (digits.length > 8)      m = `${digits.slice(0,2)}.${digits.slice(2,4)}.${digits.slice(4,6)} ${digits.slice(6,8)}:${digits.slice(8)}`;
+    else if (digits.length > 6) m = `${digits.slice(0,2)}.${digits.slice(2,4)}.${digits.slice(4,6)} ${digits.slice(6)}`;
+    else if (digits.length > 4) m = `${digits.slice(0,2)}.${digits.slice(2,4)}.${digits.slice(4)}`;
+    else if (digits.length > 2) m = `${digits.slice(0,2)}.${digits.slice(2)}`;
+    else m = digits;
+    input.value = m;
+    if (picker && digits.length >= 6) picker.highlight(toIsoDate(m.slice(0, 8)));
+  });
+
+  input.addEventListener('focus', () => {
+    if (picker) return;
+    picker = createDatePicker(input, isoDate => {
+      const [y, mo, d] = isoDate.split('-');
+      const datePart = `${d}.${mo}.${y.slice(-2)}`;
+      // Сохранить существующее время, если уже введено
+      const existingTime = input.value.match(/\s(\d{2}:\d{2})$/)?.[1];
+      input.value = existingTime ? `${datePart} ${existingTime}` : `${datePart} `;
+      picker = null;
+      // Не вызываем blur — пользователь вводит время дальше
+    });
+  });
+
+  input.addEventListener('blur', () => {
+    if (picker) { picker.destroy(); picker = null; }
+  });
+}
+
+// Автомаска ввода времени (hh:mm)
 function applyTimeMask(input) {
   input.placeholder = 'чч:мм';
   input.maxLength = 5;
@@ -411,6 +484,7 @@ const WIDGET_FIELDS = {
   FLIGHT_TICKET:      ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','baggage','tariff'],
   TRAIN_TICKET:       ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
   BUS_TICKET:         ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
+  // departure_time / arrival_time хранятся в data, но не показываются отдельно
   CAR_RENTAL:         ['car_model','plate','pickup_date','pickup_time','dropoff_date','dropoff_time'],
   MEDICAL_INSURANCE:  ['days','coverage_amount','start_date','end_date'],
   PASSPORT:           ['surname','given_names','nationality','date_of_birth','expiry_date'],
@@ -994,7 +1068,7 @@ function buildCardFieldItem(doc, key) {
   const data = doc.widget?.data || {};
   let val = data[key];
 
-  const displayed = displayFieldValue(key, val);
+  const displayed = displayFieldValue(key, val, data);
 
   const item = el('div', 'doc-field doc-field-editable');
   item.dataset.field = key;
@@ -1011,9 +1085,9 @@ function buildCardFieldItem(doc, key) {
 
     valueEl.style.display = 'none';
     const input = el('input', 'card-inline-input');
-    // Показываем в поле ввода уже отформатированное значение (актуальное)
-    input.value = displayFieldValue(key, val) || '';
-    if (DATE_FIELDS.has(key)) applyDateMask(input);
+    input.value = displayFieldValue(key, val, data) || '';
+    if (DATETIME_FIELDS.has(key)) applyDatetimeMask(input);
+    else if (DATE_FIELDS.has(key)) applyDateMask(input);
     else if (TIME_FIELDS.has(key)) applyTimeMask(input);
     else input.placeholder = WIDGET_LABELS[key] || key;
     item.appendChild(input);
@@ -1023,37 +1097,42 @@ function buildCardFieldItem(doc, key) {
       if (saved) return;
       saved = true;
       const raw = input.value.trim();
-      const newVal = DATE_FIELDS.has(key) ? toIsoDate(raw) : raw;
+
+      let newVal, patch;
+      if (DATETIME_FIELDS.has(key)) {
+        const [isoDate, isoTime] = parseIsoDatetime(raw);
+        newVal = isoDate;
+        patch = { [key]: isoDate };
+        const timeKey = DATETIME_FIELDS_MAP[key];
+        if (isoTime) { patch[timeKey] = isoTime; }
+      } else {
+        newVal = DATE_FIELDS.has(key) ? toIsoDate(raw) : raw;
+        patch = { [key]: newVal };
+      }
+
+      // Авто-пересчёт ночей при изменении дат заезда/выезда
+      if (key === 'check_in' || key === 'check_out') {
+        if (!doc.widget) doc.widget = { data: {} };
+        if (!doc.widget.data) doc.widget.data = {};
+        const ci = key === 'check_in' ? newVal : doc.widget.data.check_in;
+        const co = key === 'check_out' ? newVal : doc.widget.data.check_out;
+        const nights = calcNights(ci, co);
+        if (nights !== null) patch.nights = String(nights);
+      }
+
       try {
-        const patch = { [key]: newVal };
-
-        // Авто-пересчёт ночей при изменении дат заезда/выезда
-        if (key === 'check_in' || key === 'check_out') {
-          if (!doc.widget) doc.widget = { data: {} };
-          if (!doc.widget.data) doc.widget.data = {};
-          const ci = key === 'check_in' ? newVal : doc.widget.data.check_in;
-          const co = key === 'check_out' ? newVal : doc.widget.data.check_out;
-          const nights = calcNights(ci, co);
-          if (nights !== null) patch.nights = String(nights);
-        }
-
         await API.put(`/api/documents/${doc.id}/widget`, patch);
         if (!doc.widget) doc.widget = { data: {} };
         if (!doc.widget.data) doc.widget.data = {};
-        doc.widget.data[key] = newVal;
+        Object.assign(doc.widget.data, patch);
         val = newVal;
-        const newDisplayed = displayFieldValue(key, newVal);
+        const newDisplayed = displayFieldValue(key, newVal, doc.widget.data);
         valueEl.textContent = newDisplayed || 'не заполнено';
         valueEl.className = `doc-field-value${!newDisplayed ? ' empty' : ''}`;
 
-        // Обновить отображение nights в карточке
         if (patch.nights !== undefined) {
-          doc.widget.data.nights = patch.nights;
           const nightsEl = item.closest('.doc-card-body')?.querySelector('[data-field="nights"] .doc-field-value');
-          if (nightsEl) {
-            nightsEl.textContent = patch.nights;
-            nightsEl.classList.remove('empty');
-          }
+          if (nightsEl) { nightsEl.textContent = patch.nights; nightsEl.classList.remove('empty'); }
         }
 
         showToast('Сохранено');
@@ -1260,18 +1339,25 @@ function renderDocDetailBody(body, doc) {
     body.appendChild(sectionTitle);
 
     const allFields = [...new Set([...fields, ...Object.keys(data)])];
+    // Скрыть отдельные поля времени, которые объединены с датой в DATETIME_FIELDS
+    const hiddenTimeKeys = new Set(
+      allFields.filter(k => DATETIME_FIELDS.has(k)).map(k => DATETIME_FIELDS_MAP[k])
+    );
+    const visibleDetailFields = allFields.filter(k => !hiddenTimeKeys.has(k));
+
     const widgetCard = el('div', 'widget-card');
     const widgetDiv = el('div', 'widget-fields');
 
-    allFields.forEach(key => {
+    visibleDetailFields.forEach(key => {
       const val = data[key];
-      const row = buildWidgetFieldRow(key, val, async (newVal) => {
+      const row = buildWidgetFieldRow(key, val, async (newVal, extraPatch) => {
         try {
-          await API.put(`/api/documents/${doc.id}/widget`, { [key]: newVal });
-          doc.widget.data[key] = newVal;
+          const patch = { [key]: newVal, ...(extraPatch || {}) };
+          await API.put(`/api/documents/${doc.id}/widget`, patch);
+          Object.assign(doc.widget.data, patch);
           showToast('Сохранено');
         } catch (e) { showToast('Ошибка: ' + e.message); }
-      });
+      }, data);
       widgetDiv.appendChild(row);
     });
 
@@ -1320,8 +1406,8 @@ function renderDocDetailBody(body, doc) {
   body.appendChild(delBtn);
 }
 
-function buildWidgetFieldRow(key, val, onSave) {
-  const displayed = displayFieldValue(key, val);
+function buildWidgetFieldRow(key, val, onSave, allData) {
+  const displayed = displayFieldValue(key, val, allData);
 
   const row = el('div', 'widget-field-row');
   const label = el('div', 'widget-field-key', escHtml(WIDGET_LABELS[key] || key));
@@ -1339,8 +1425,9 @@ function buildWidgetFieldRow(key, val, onSave) {
     valEl.style.display = 'none';
 
     const input = el('input', 'inline-edit-input');
-    input.value = displayFieldValue(key, val) || '';
-    if (DATE_FIELDS.has(key)) applyDateMask(input);
+    input.value = displayFieldValue(key, val, allData) || '';
+    if (DATETIME_FIELDS.has(key)) applyDatetimeMask(input);
+    else if (DATE_FIELDS.has(key)) applyDateMask(input);
     else if (TIME_FIELDS.has(key)) applyTimeMask(input);
     else input.placeholder = WIDGET_LABELS[key] || key;
     row.appendChild(input);
@@ -1350,11 +1437,19 @@ function buildWidgetFieldRow(key, val, onSave) {
       if (saved) return;
       saved = true;
       const raw = input.value.trim();
-      const newVal = DATE_FIELDS.has(key) ? toIsoDate(raw) : raw;
+      let newVal, extraPatch;
+      if (DATETIME_FIELDS.has(key)) {
+        const [isoDate, isoTime] = parseIsoDatetime(raw);
+        newVal = isoDate;
+        extraPatch = isoTime ? { [DATETIME_FIELDS_MAP[key]]: isoTime } : undefined;
+      } else {
+        newVal = DATE_FIELDS.has(key) ? toIsoDate(raw) : raw;
+      }
       try {
-        await onSave(newVal);
+        await onSave(newVal, extraPatch);
         val = newVal;
-        const newDisplayed = displayFieldValue(key, newVal);
+        if (allData && extraPatch) Object.assign(allData, extraPatch);
+        const newDisplayed = displayFieldValue(key, newVal, allData);
         valEl.textContent = newDisplayed || 'не заполнено';
         valEl.className = `widget-field-val${!newDisplayed ? ' empty' : ''}`;
       } finally {
