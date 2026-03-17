@@ -1040,7 +1040,7 @@ html, body {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 0;
   padding: 4px var(--gap) 14px;
 }
 
@@ -1056,15 +1056,49 @@ html, body {
   position: relative;
   transition: background .1s;
 }
+
+.cal-day-num {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
 .cal-cell.empty { pointer-events: none; }
-.cal-cell:not(.empty):hover { background: rgba(255,255,255,0.06); }
+.cal-cell:not(.empty):not(.in-trip):hover .cal-day-num { background: rgba(255,255,255,0.06); }
 .cal-cell.other-month { color: var(--text-hint); opacity: .4; }
-.cal-cell.today { color: var(--accent); font-weight: 600; }
-.cal-cell.selected {
+.cal-cell.today .cal-day-num { color: var(--accent); font-weight: 600; }
+.cal-cell.selected .cal-day-num {
   background: var(--accent);
   color: #fff !important;
   font-weight: 600;
 }
+
+/* ── Подсветка периода поездки ── */
+.cal-cell.in-trip::before {
+  content: '';
+  position: absolute;
+  inset: 20% 0;
+  background: rgba(70,77,245,0.35);
+  z-index: 0;
+}
+.cal-cell.trip-start::before { left: 50%; border-radius: 50px 0 0 50px; }
+.cal-cell.trip-end::before   { right: 50%; border-radius: 0 50px 50px 0; }
+.cal-cell.trip-start.trip-end::before { left: 0; right: 0; border-radius: 50px; }
+
+.cal-cell.trip-start .cal-day-num,
+.cal-cell.trip-end .cal-day-num {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+.cal-cell.in-trip:not(.trip-start):not(.trip-end) .cal-day-num {
+  color: #fff;
+}
+
 .cal-cell.has-events::after {
   content: '';
   position: absolute;
