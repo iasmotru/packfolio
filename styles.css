@@ -1060,40 +1060,46 @@ html, body {
 .cal-day-num {
   position: relative;
   z-index: 1;
-  width: 100%;
-  height: 100%;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 .cal-cell.empty { pointer-events: none; }
-.cal-cell:not(.empty):not(.in-trip):hover .cal-day-num { background: rgba(255,255,255,0.06); }
+.cal-cell:not(.empty):not(.in-trip):hover .cal-day-num { background: rgba(255,255,255,0.06); border-radius: 50%; }
 .cal-cell.other-month { color: var(--text-hint); opacity: .4; }
 .cal-cell.today .cal-day-num { color: var(--accent); font-weight: 600; }
 .cal-cell.selected .cal-day-num {
   background: var(--accent);
   color: #fff !important;
   font-weight: 600;
+  border-radius: 4px;
 }
 
 /* ── Подсветка периода поездки ── */
 .cal-cell.in-trip::before {
   content: '';
   position: absolute;
-  inset: 20% 0;
+  top: calc(50% - 16px);
+  bottom: calc(50% - 16px);
+  left: 0;
+  right: 0;
   background: rgba(70,77,245,0.35);
   z-index: 0;
 }
-.cal-cell.trip-start::before { left: 50%; border-radius: 50px 0 0 50px; }
-.cal-cell.trip-end::before   { right: 50%; border-radius: 0 50px 50px 0; }
-.cal-cell.trip-start.trip-end::before { left: 0; right: 0; border-radius: 50px; }
+.cal-cell.trip-start::before { left: 50%; border-radius: 4px 0 0 4px; }
+.cal-cell.trip-end::before   { right: 50%; border-radius: 0 4px 4px 0; }
+.cal-cell.trip-start.trip-end::before { left: 0; right: 0; border-radius: 4px; }
 
 .cal-cell.trip-start .cal-day-num,
 .cal-cell.trip-end .cal-day-num {
   background: var(--accent);
   color: #fff;
   font-weight: 600;
+  border-radius: 4px;
 }
 .cal-cell.in-trip:not(.trip-start):not(.trip-end) .cal-day-num {
   color: #fff;
