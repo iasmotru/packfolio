@@ -403,6 +403,9 @@ function applyTimeMask(input) {
 }
 
 // Поля для каждого типа документа (отображаемые в виджете)
+// Поля, которые в мини-карточке показываются только если заполнены
+const OPTIONAL_MINI_FIELDS = new Set(['seat','baggage','tariff','passengers']);
+
 const WIDGET_FIELDS = {
   HOTEL_BOOKING:      ['hotel_name','address','check_in','check_out','nights','room_type','guests'],
   FLIGHT_TICKET:      ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','baggage','tariff'],
@@ -939,11 +942,14 @@ function buildDocMiniCard(doc) {
   header.onclick = () => openDocDetail(doc);
   card.appendChild(header);
 
-  // Editable fields grid — shows ALL required fields
-  if (fields.length) {
+  // Editable fields grid — optional fields only if filled
+  const visibleFields = fields.filter(key =>
+    !OPTIONAL_MINI_FIELDS.has(key) || (data[key] !== null && data[key] !== undefined && data[key] !== '')
+  );
+  if (visibleFields.length) {
     card.appendChild(el('div', 'doc-card-divider'));
     const body = el('div', 'doc-card-body');
-    fields.forEach(key => body.appendChild(buildCardFieldItem(doc, key)));
+    visibleFields.forEach(key => body.appendChild(buildCardFieldItem(doc, key)));
     card.appendChild(body);
   }
 
