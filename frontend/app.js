@@ -1552,6 +1552,19 @@ function renderCalendarGrid(container) {
       .filter(Boolean)
   );
 
+  // Вычисляем покрытие поездками для каждого дня
+  const getTripInfo = (dateStr) => {
+    for (const trip of State.trips) {
+      if (!trip.start_date || !trip.end_date) continue;
+      const s = trip.start_date.substring(0, 10);
+      const e = trip.end_date.substring(0, 10);
+      if (dateStr >= s && dateStr <= e) {
+        return { inTrip: true, isStart: dateStr === s, isEnd: dateStr === e };
+      }
+    }
+    return { inTrip: false };
+  };
+
   // Пустые ячейки до начала месяца
   for (let i = 0; i < startOffset; i++) {
     grid.appendChild(el('div', 'cal-cell empty'));
@@ -1559,16 +1572,24 @@ function renderCalendarGrid(container) {
 
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isToday   = today.getFullYear() === year && today.getMonth() + 1 === month && today.getDate() === d;
+    const isToday    = today.getFullYear() === year && today.getMonth() + 1 === month && today.getDate() === d;
     const isSelected = State.calSelectedDay === dateStr;
-    const hasEvents = eventDays.has(dateStr);
+    const hasEvents  = eventDays.has(dateStr);
+    const tripInfo   = getTripInfo(dateStr);
 
-    const cell = el('div', [
+    const classes = [
       'cal-cell',
-      isToday    ? 'today'    : '',
-      isSelected ? 'selected' : '',
+      isToday    ? 'today'      : '',
+      isSelected ? 'selected'   : '',
       hasEvents  ? 'has-events' : '',
-    ].filter(Boolean).join(' '), String(d));
+      tripInfo.inTrip  ? 'in-trip'    : '',
+      tripInfo.isStart ? 'trip-start' : '',
+      tripInfo.isEnd   ? 'trip-end'   : '',
+    ].filter(Boolean).join(' ');
+
+    const cell = el('div', classes);
+    const numSpan = el('span', 'cal-day-num', String(d));
+    cell.appendChild(numSpan);
 
     cell.onclick = () => {
       State.calSelectedDay = isSelected ? null : dateStr;
@@ -1578,7 +1599,6 @@ function renderCalendarGrid(container) {
         evList.remove();
         renderEventsList(parent);
       }
-      // Перерисовываем только ячейки
       qsa('.cal-cell:not(.empty)', grid).forEach(c => c.classList.remove('selected'));
       if (!isSelected) cell.classList.add('selected');
     };
