@@ -225,6 +225,62 @@ const WIDGET_LABELS = {
   expiry_date:       'Действует до',
 };
 
+// Типы полей для форматирования
+const DATE_FIELDS = new Set([
+  'check_in','check_out','departure_date','arrival_date',
+  'pickup_date','dropoff_date','start_date','end_date',
+  'date_of_birth','expiry_date',
+]);
+const TIME_FIELDS = new Set([
+  'departure_time','arrival_time','pickup_time','dropoff_time',
+]);
+
+// Отображение значения поля с учётом типа
+function displayFieldValue(key, val) {
+  if (val === null || val === undefined || val === '') return null;
+  const s = String(val);
+  if (DATE_FIELDS.has(key)) return formatDate(s);   // → dd.mm.yy
+  return s;
+}
+
+// Конвертация dd.mm.yy(yy) → YYYY-MM-DD для хранения
+function toIsoDate(str) {
+  if (!str) return str;
+  const s = str.trim();
+  // dd.mm.yy
+  const m2 = s.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+  if (m2) return `20${m2[3]}-${m2[2]}-${m2[1]}`;
+  // dd.mm.yyyy
+  const m4 = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (m4) return `${m4[3]}-${m4[2]}-${m4[1]}`;
+  return s;
+}
+
+// Автомаска ввода даты (dd.mm.yy)
+function applyDateMask(input) {
+  input.placeholder = 'дд.мм.гг';
+  input.maxLength = 8;
+  input.addEventListener('input', (e) => {
+    const sel = input.selectionStart;
+    let digits = input.value.replace(/\D/g, '').slice(0, 6);
+    let masked = '';
+    if (digits.length > 4) masked = digits.slice(0,2) + '.' + digits.slice(2,4) + '.' + digits.slice(4);
+    else if (digits.length > 2) masked = digits.slice(0,2) + '.' + digits.slice(2);
+    else masked = digits;
+    input.value = masked;
+  });
+}
+
+// Автомаска ввода времени (hh:mm)
+function applyTimeMask(input) {
+  input.placeholder = 'чч:мм';
+  input.maxLength = 5;
+  input.addEventListener('input', () => {
+    let digits = input.value.replace(/\D/g, '').slice(0, 4);
+    input.value = digits.length > 2 ? digits.slice(0,2) + ':' + digits.slice(2) : digits;
+  });
+}
+
 // Поля для каждого типа документа (отображаемые в виджете)
 const WIDGET_FIELDS = {
   HOTEL_BOOKING:      ['hotel_name','address','check_in','check_out','nights','room_type','guests'],
@@ -807,11 +863,13 @@ function buildCardFieldItem(doc, key) {
   const data = doc.widget?.data || {};
   let val = data[key];
 
+  const displayed = displayFieldValue(key, val);
+
   const item = el('div', 'doc-field doc-field-editable');
   item.dataset.field = key;
   const labelEl = el('div', 'doc-field-label', escHtml(WIDGET_LABELS[key] || key));
-  const valueEl = el('div', `doc-field-value${!val && val !== 0 ? ' empty' : ''}`,
-    val !== null && val !== undefined && val !== '' ? escHtml(String(val)) : 'не заполнено');
+  const valueEl = el('div', `doc-field-value${!displayed ? ' empty' : ''}`,
+    displayed ? escHtml(displayed) : 'не заполнено');
 
   item.appendChild(labelEl);
   item.appendChild(valueEl);
@@ -822,15 +880,19 @@ function buildCardFieldItem(doc, key) {
 
     valueEl.style.display = 'none';
     const input = el('input', 'card-inline-input');
-    input.value = val !== null && val !== undefined ? String(val) : '';
-    input.placeholder = WIDGET_LABELS[key] || key;
+    // Показываем в поле ввода уже отформатированное значение
+    input.value = displayed || '';
+    if (DATE_FIELDS.has(key)) applyDateMask(input);
+    else if (TIME_FIELDS.has(key)) applyTimeMask(input);
+    else input.placeholder = WIDGET_LABELS[key] || key;
     item.appendChild(input);
 
     let saved = false;
     const save = async () => {
       if (saved) return;
       saved = true;
-      const newVal = input.value.trim();
+      const raw = input.value.trim();
+      const newVal = DATE_FIELDS.has(key) ? toIsoDate(raw) : raw;
       try {
         const patch = { [key]: newVal };
 
@@ -849,8 +911,9 @@ function buildCardFieldItem(doc, key) {
         if (!doc.widget.data) doc.widget.data = {};
         doc.widget.data[key] = newVal;
         val = newVal;
-        valueEl.textContent = newVal || 'не заполнено';
-        valueEl.className = `doc-field-value${!newVal ? ' empty' : ''}`;
+        const newDisplayed = displayFieldValue(key, newVal);
+        valueEl.textContent = newDisplayed || 'не заполнено';
+        valueEl.className = `doc-field-value${!newDisplayed ? ' empty' : ''}`;
 
         // Обновить отображение nights в карточке
         if (patch.nights !== undefined) {
@@ -1127,10 +1190,12 @@ function renderDocDetailBody(body, doc) {
 }
 
 function buildWidgetFieldRow(key, val, onSave) {
+  const displayed = displayFieldValue(key, val);
+
   const row = el('div', 'widget-field-row');
   const label = el('div', 'widget-field-key', escHtml(WIDGET_LABELS[key] || key));
-  const valEl = el('div', `widget-field-val${!val && val !== 0 ? ' empty' : ''}`,
-    val !== null && val !== undefined && val !== '' ? escHtml(String(val)) : 'не заполнено');
+  const valEl = el('div', `widget-field-val${!displayed ? ' empty' : ''}`,
+    displayed ? escHtml(displayed) : 'не заполнено');
   const editBtn = el('button', 'widget-field-edit', 'изм.');
 
   row.appendChild(label);
@@ -1143,16 +1208,20 @@ function buildWidgetFieldRow(key, val, onSave) {
     valEl.style.display = 'none';
 
     const input = el('input', 'inline-edit-input');
-    input.value = val !== null && val !== undefined ? String(val) : '';
-    input.placeholder = WIDGET_LABELS[key] || key;
+    input.value = displayed || '';
+    if (DATE_FIELDS.has(key)) applyDateMask(input);
+    else if (TIME_FIELDS.has(key)) applyTimeMask(input);
+    else input.placeholder = WIDGET_LABELS[key] || key;
     row.appendChild(input);
 
     const saveInline = async () => {
-      const newVal = input.value.trim();
+      const raw = input.value.trim();
+      const newVal = DATE_FIELDS.has(key) ? toIsoDate(raw) : raw;
       await onSave(newVal);
       val = newVal;
-      valEl.textContent = newVal || 'не заполнено';
-      valEl.className = `widget-field-val${!newVal ? ' empty' : ''}`;
+      const newDisplayed = displayFieldValue(key, newVal);
+      valEl.textContent = newDisplayed || 'не заполнено';
+      valEl.className = `widget-field-val${!newDisplayed ? ' empty' : ''}`;
       input.remove();
       editBtn.style.display = '';
       valEl.style.display = '';

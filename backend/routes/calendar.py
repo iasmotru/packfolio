@@ -37,6 +37,12 @@ def normalize_date(raw: Optional[str]) -> Optional[str]:
         d, mo, y = m.group(1), m.group(2), m.group(3)
         return f"{y}-{mo.zfill(2)}-{d.zfill(2)}"
 
+    # DD.MM.YY (2-значный год)
+    m = re.match(r"^(\d{1,2})[./](\d{1,2})[./](\d{2})$", raw)
+    if m:
+        d, mo, y = m.group(1), m.group(2), m.group(3)
+        return f"20{y}-{mo.zfill(2)}-{d.zfill(2)}"
+
     # D Month YYYY
     months = {
         "jan": "01", "feb": "02", "mar": "03", "apr": "04",
