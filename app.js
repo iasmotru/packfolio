@@ -674,7 +674,6 @@ function openTripForm(trip = null) {
 
 function openTripDetail(trip) {
   Modal.open(sheet => {
-    const docs = State.documents.filter(d => d.trip_id === trip.id);
     sheet.appendChild(Modal.buildHeader(trip.title));
 
     const body = el('div', 'modal-body');
@@ -684,21 +683,9 @@ function openTripDetail(trip) {
         <div>📆 ${trip.start_date ? formatDate(trip.start_date) : '—'} → ${trip.end_date ? formatDate(trip.end_date) : '—'}</div>
         ${trip.note ? `<div style="margin-top:10px;color:var(--text-hint);font-size:14px">${escHtml(trip.note)}</div>` : ''}
       </div>
-
-      <div class="section-title">Документы (${docs.length})</div>
+      <div class="section-title">Документы</div>
+      <div class="loader"><div class="spinner"></div></div>
     `;
-
-    if (docs.length) {
-      docs.forEach(doc => {
-        const miniCard = buildDocMiniCard(doc);
-        miniCard.style.margin = '0 0 8px 0';
-        body.appendChild(miniCard);
-      });
-    } else {
-      const empty = el('div', '', `<div style="color:var(--text-hint);text-align:center;padding:24px;font-size:14px;background:var(--bg-elevated);border-radius:var(--radius-sm);border:1px solid var(--border)">Нет прикреплённых документов</div>`);
-      body.appendChild(empty);
-    }
-
     sheet.appendChild(body);
 
     const footer = el('div', 'modal-footer');
@@ -706,6 +693,28 @@ function openTripDetail(trip) {
     editBtn.onclick = () => { Modal.close(); openTripForm(trip); };
     footer.appendChild(editBtn);
     sheet.appendChild(footer);
+
+    // Загружаем документы поездки через API
+    API.get(`/api/documents?trip_id=${trip.id}`).then(docs => {
+      const loader = body.querySelector('.loader');
+      if (loader) loader.remove();
+
+      const title = body.querySelector('.section-title');
+      if (title) title.textContent = `Документы (${docs?.length || 0})`;
+
+      if (docs?.length) {
+        docs.forEach(doc => {
+          const miniCard = buildDocMiniCard(doc);
+          miniCard.style.margin = '0 0 8px 0';
+          body.appendChild(miniCard);
+        });
+      } else {
+        body.appendChild(el('div', '', `<div style="color:var(--text-hint);text-align:center;padding:24px;font-size:14px;background:var(--bg-elevated);border-radius:var(--radius-sm);border:1px solid var(--border)">Нет прикреплённых документов</div>`));
+      }
+    }).catch(() => {
+      const loader = body.querySelector('.loader');
+      if (loader) loader.remove();
+    });
   });
 }
 
