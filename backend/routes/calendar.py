@@ -147,8 +147,13 @@ def get_calendar(
 
     events = docs_to_events(docs, trips)
 
-    # Фильтр по месяцу
+    # Фильтр по месяцу: включаем события, которые НАЧАЛИСЬ в этом месяце
+    # ИЛИ продолжаются в этот месяц (start <= month <= end)
     if month:
-        events = [e for e in events if e.get("date", "").startswith(month)]
+        def overlaps_month(e):
+            s  = (e.get("date")     or "")[:7]
+            en = (e.get("end_date") or e.get("date") or "")[:7]
+            return s <= month <= en
+        events = [e for e in events if overlaps_month(e)]
 
     return {"month": month, "events": events}
