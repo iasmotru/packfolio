@@ -1,0 +1,18 @@
+fastapi==0.115.5
+python-dotenv==1.0.1
+uvicorn[standard]==0.32.1
+sqlalchemy==2.0.36
+pydantic==2.10.3
+python-jose[cryptography]==3.3.0
+PyJWT==2.10.1
+python-multipart==0.0.18
+pypdf==5.1.0
+python-dateutil==2.9.0.post0
+
+# OCR (опционально, включить ENABLE_OCR=1)
+# Раскомментировать при необходимости:
+# pytesseract==0.3.13
+# Pillow==11.0.0
+
+# Apple Wallet (опционально, нужны сертификаты)
+# cryptography уже входит в python-jose[cryptography]
