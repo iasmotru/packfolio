@@ -113,6 +113,15 @@ def set_document_tags(db: Session, doc: Document, tag_ids: List[int], user_id: i
 # Эндпоинты
 # ──────────────────────────────────────────────
 
+def _leg_title(seg: dict, idx: int) -> str:
+    """Generates a route-based auto-title for a flight leg segment."""
+    dep = seg.get('departure_place', '')
+    arr = seg.get('arrival_place', '')
+    if dep and arr:
+        return f"{dep} → {arr}"
+    return f"Сегмент {idx + 1}"
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def upload_document(
     file:    UploadFile = File(...),
@@ -133,43 +142,65 @@ async def upload_document(
 
     file_path, mime = save_upload(file)
 
-    # Парсинг
-    doc_type, confidence, extracted = parse_document(file_path, mime)
+    # Парсинг: segments — всегда список
+    doc_type, confidence, segments = parse_document(file_path, mime)
 
-    # Создаём документ
-    doc = Document(
-        user_id=user_id,
-        trip_id=trip_id,
-        doc_type=doc_type,
-        title=title or (file.filename or "Без названия"),
-        file_path=file_path,
-        file_mime=mime,
-    )
-    db.add(doc)
-    db.flush()  # получаем doc.id
+    is_multi = len(segments) >= 2
 
-    # Создаём WidgetData
-    wd = WidgetData(
-        document_id=doc.id,
-        data=extracted,
-        extracted_data=extracted,
-        confidence=confidence,
-        last_parsed_at=datetime.utcnow(),
-    )
-    db.add(wd)
-
-    # Теги
+    # Теги (парсим один раз)
+    tag_ids: List[int] = []
     if tags:
         import json
         try:
             tag_ids = json.loads(tags)
-            set_document_tags(db, doc, tag_ids, user_id)
         except Exception:
             pass
 
+    created_docs: List[Document] = []
+
+    for idx, seg in enumerate(segments):
+        # Заголовок: если пользователь задал и сегмент один — используем его
+        if title and not is_multi:
+            doc_title = title
+        elif doc_type == "FLIGHT_TICKET":
+            doc_title = _leg_title(seg, idx)
+        elif doc_type == "HOTEL_BOOKING":
+            doc_title = seg.get("hotel_name") or title or (file.filename or "Без названия")
+        else:
+            doc_title = title or (file.filename or "Без названия")
+
+        doc = Document(
+            user_id=user_id,
+            trip_id=trip_id,
+            doc_type=doc_type,
+            title=doc_title,
+            file_path=file_path,
+            file_mime=mime,
+        )
+        db.add(doc)
+        db.flush()  # получаем doc.id
+
+        wd = WidgetData(
+            document_id=doc.id,
+            data=seg,
+            extracted_data=seg,
+            confidence=confidence,
+            last_parsed_at=datetime.utcnow(),
+        )
+        db.add(wd)
+
+        if tag_ids:
+            set_document_tags(db, doc, tag_ids, user_id)
+
+        created_docs.append(doc)
+
     db.commit()
-    db.refresh(doc)
-    return doc_to_dict(doc)
+    for doc in created_docs:
+        db.refresh(doc)
+
+    if is_multi:
+        return [doc_to_dict(d) for d in created_docs]
+    return doc_to_dict(created_docs[0])
 
 
 @router.get("")
@@ -293,7 +324,8 @@ async def replace_file(
     doc.file_mime = mime
 
     # Перепарсим
-    doc_type, confidence, extracted = parse_document(file_path, mime)
+    doc_type, confidence, segments = parse_document(file_path, mime)
+    extracted = segments[0] if segments else {}
     doc.doc_type   = doc_type
     doc.updated_at = datetime.utcnow()
 

@@ -6,7 +6,7 @@
 import os
 import re
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 ENABLE_OCR = os.getenv("ENABLE_OCR", "0") == "1"
 
@@ -82,13 +82,27 @@ DOC_PATTERNS: Dict[str, list] = {
     "FLIGHT_TICKET": [
         r"\bflight\b",
         r"\bairline\b",
-        r"\bboarding pass\b",
+        r"\bboarding.?pass\b",
         r"\bpnr\b",
         r"\bcheck.?in\b",
         r"\bgate\b",
         r"\b[A-Z]{2}\s*\d{3,4}\b",  # номер рейса
         r"\bairport\b",
         r"\bbaggage\b",
+        r"\be.?ticket\b",
+        r"\bboarding\b",
+        r"\b(pegasus|turkish|ryanair|easyjet|wizz|flydubai|aeroflot)\b",
+        r"\bdeparture\b",
+        r"\barrival\b",
+        # Русские паттерны
+        r"\bэлектронный\s+билет\b",
+        r"\bномер\s+брони\b",
+        r"\bвылет\b",
+        r"\bприлёт\b",
+        r"\bрейс\b",
+        r"\bполёт\b|\bполет\b",
+        r"\bаэропорт\b",
+        r"\bбагаж\b",
     ],
     "TRAIN_TICKET": [
         r"\btrain\b",
@@ -216,6 +230,7 @@ DATE_PATTERNS = [
     r"\d{1,2}[./\-]\d{1,2}[./\-]\d{2}",              # dd/mm/yy
     rf"\d{{1,2}}\s+{_WORD}\.?\s+\d{{4}}",             # "5 August 2024", "5 августа 2024"
     rf"{_WORD}\.?\s+\d{{1,2}},?\s+\d{{4}}",           # "August 5, 2024"
+    r"\d{1,2}[A-Za-z]{3}\d{2,4}",                     # "26AUG26" / "26AUG2026" авиа-формат
 ]
 
 TIME_PATTERN = r"\b(\d{1,2}:\d{2}(?::\d{2})?)\b"
@@ -228,8 +243,9 @@ _CHECKOUT_KW = r"check[\s\-]?out|departure|выезд|отъезд|дата\s+в
 _DATE_CTX = (
     r"(\d{4}[./\-]\d{1,2}[./\-]\d{1,2}"
     r"|\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4}"
-    rf"|\d{{1,2}}\s+{_WORD}+\.?\s+\d{{4}}"
-    rf"|{_WORD}+\.?\s+\d{{1,2}},?\s+\d{{4}})"
+    rf"|\d{{1,2}}\s+{_WORD}\.?\s+\d{{4}}"
+    rf"|{_WORD}\.?\s+\d{{1,2}},?\s+\d{{4}}"
+    r"|\d{1,2}[A-Za-z]{3}\d{2,4})"
 )
 
 
@@ -273,6 +289,15 @@ def normalize_date_str(s: str) -> Optional[str]:
         mon = MONTH_MAP.get(m.group(1).lower())
         if mon:
             return f"{m.group(3)}-{str(mon).zfill(2)}-{m.group(2).zfill(2)}"
+
+    # "26AUG26" / "26AUG2026" авиа-формат
+    m = re.match(r"^(\d{1,2})([A-Za-z]{3})(\d{2,4})$", s)
+    if m:
+        mon = MONTH_MAP.get(m.group(2).lower())
+        if mon:
+            y = m.group(3)
+            year = ("20" + y if len(y) == 2 else y)
+            return f"{year}-{str(mon).zfill(2)}-{m.group(1).zfill(2)}"
 
     return s  # вернём как есть, если не распознали
 
@@ -319,6 +344,15 @@ def find_date_after_keyword(text: str, keyword_re: str) -> Optional[str]:
 
 def find_times(text: str) -> list:
     return re.findall(TIME_PATTERN, text)
+
+
+def find_time_after_keyword(text: str, keyword_re: str) -> Optional[str]:
+    """Ищет время (HH:MM) сразу после ключевого слова (в пределах 120 символов)."""
+    m = re.search(
+        rf"(?:{keyword_re})[^\n]{{0,120}}{TIME_PATTERN}",
+        text, re.IGNORECASE,
+    )
+    return m.group(m.lastindex) if m else None
 
 
 def first_or_none(lst: list, idx: int = 0) -> Optional[str]:
@@ -384,73 +418,491 @@ def extract_hotel_data(text: str) -> Dict[str, Any]:
     return data
 
 
+def _extract_airline_itinerary(lines: list) -> Optional[Dict]:
+    """
+    Парсит маршрутную строку вида:
+      CITY FLIGHT_NO CL DATE HHMM STATUS ...
+      (AIRPORT) ... arrival date and time: DATE HHMM
+      ARRIVAL_CITY
+      (ARRIVAL_AIRPORT)
+    Используется для билетов без IATA-кодов в скобках (Pobeda, S7 и т.п.).
+    """
+    for i, line in enumerate(lines):
+        m = re.search(
+            r'^([A-Z][A-Z ]{1,20})\s+([A-Z]{2})\s*(\d{3,4})\s+[A-Z]\s+'
+            r'(\d{1,2}[A-Za-z]{3}\d{2,4})\s+(\d{4})\b',
+            line.strip(),
+        )
+        if not m:
+            continue
+
+        dep_city = m.group(1).strip().title()
+        flight_no = m.group(2) + m.group(3)
+        dep_date = normalize_date_str(m.group(4))
+        dep_time_raw = m.group(5)
+        dep_time = f"{dep_time_raw[:2]}:{dep_time_raw[2:]}"
+
+        result: Dict[str, Any] = {
+            'flight_no': flight_no,
+            'dep_city': dep_city,
+            'dep_date': dep_date,
+            'dep_time': dep_time,
+            'arr_date': None,
+            'arr_time': None,
+            'arr_city': None,
+        }
+
+        for j in range(i + 1, min(len(lines), i + 8)):
+            ln = lines[j].strip()
+
+            # Arrival datetime: "arrival date and time: DATE HHMM" / "прибытия: DATE HHMM"
+            if not result['arr_date']:
+                am = re.search(
+                    r'(?:arrival\s+date\s+and\s+time|прибытия)[:\s/]+(\d{1,2}[A-Za-z]{3}\d{2,4})\s+(\d{4})',
+                    ln, re.IGNORECASE,
+                )
+                if am:
+                    result['arr_date'] = normalize_date_str(am.group(1))
+                    result['arr_time'] = f"{am.group(2)[:2]}:{am.group(2)[2:]}"
+
+            # Arrival city: строка только из заглавных букв и пробелов (не заголовок)
+            if not result['arr_city'] and re.match(r'^[A-Z][A-Z ]+$', ln) and 3 < len(ln) < 40:
+                result['arr_city'] = ln.strip().title()
+
+        return result
+
+    return None
+
+
+def _extract_flight_legs(lines: list, pnr: str = None) -> list:
+    """
+    Splits a multi-segment flight ticket into individual leg dicts.
+    Detects segment headers like "Мадрид, Испания - Белград, Сербия".
+    Returns a list of dicts (one per leg), or [] if fewer than 2 segments found.
+    """
+    HEADER_RE = re.compile(
+        r'^([А-ЯЁA-Z][^\d\n,]{1,30}),\s*\S+\s*[-—]\s*([А-ЯЁA-Z][^\d\n,]{1,30}),?',
+    )
+    FLIGHT_RE = re.compile(
+        r'(?:номер\s+рейса|flight\s+(?:number|no\.?))[:\s]+([A-Z]{2})[\s\-]*(\d{3,4})',
+        re.IGNORECASE,
+    )
+    DEP_RE = re.compile(r'(?:вылет|departure)[:\s]+(\d{1,2}:\d{2})', re.IGNORECASE)
+    ARR_RE = re.compile(r'(?:прилет|прилёт|arrival)[:\s]+(\d{1,2}:\d{2})', re.IGNORECASE)
+    IATA_RE = re.compile(r'\(([A-Z]{3})\)')
+
+    # Find all header line indices and their city pairs
+    header_indices = []
+    for i, line in enumerate(lines):
+        m = HEADER_RE.match(line.strip())
+        if m:
+            dep_city = m.group(1).strip()
+            arr_city = m.group(2).strip()
+            header_indices.append((i, dep_city, arr_city))
+
+    if len(header_indices) < 2:
+        return []
+
+    # Build segments: each segment spans from one header to the next
+    result = []
+    for seg_idx, (start_i, dep_city, arr_city) in enumerate(header_indices):
+        end_i = header_indices[seg_idx + 1][0] if seg_idx + 1 < len(header_indices) else len(lines)
+        seg_lines = lines[start_i:end_i]
+        seg_text = '\n'.join(seg_lines)
+
+        leg: Dict[str, Any] = {}
+        if pnr:
+            leg['pnr'] = pnr
+
+        # Flight number
+        fm = FLIGHT_RE.search(seg_text)
+        if fm:
+            leg['flight_number'] = fm.group(1).upper() + fm.group(2)
+
+        # Departure time + date
+        for j, ln in enumerate(seg_lines):
+            dm = DEP_RE.search(ln)
+            if dm:
+                leg['departure_time'] = dm.group(1)
+                # Date is on the next line
+                if j + 1 < len(seg_lines):
+                    next_ln = seg_lines[j + 1]
+                    for p in DATE_PATTERNS:
+                        date_m = re.search(p, next_ln, re.IGNORECASE)
+                        if date_m:
+                            leg['departure_date'] = normalize_date_str(date_m.group(0))
+                            break
+                break
+
+        # Arrival time + date
+        for j, ln in enumerate(seg_lines):
+            am = ARR_RE.search(ln)
+            if am:
+                leg['arrival_time'] = am.group(1)
+                if j + 1 < len(seg_lines):
+                    next_ln = seg_lines[j + 1]
+                    for p in DATE_PATTERNS:
+                        date_m = re.search(p, next_ln, re.IGNORECASE)
+                        if date_m:
+                            leg['arrival_date'] = normalize_date_str(date_m.group(0))
+                            break
+                break
+
+        # IATA codes: first = departure, second = arrival
+        iata_codes = IATA_RE.findall(seg_text)
+        if len(iata_codes) >= 1:
+            leg['departure_place'] = f"{dep_city} ({iata_codes[0]})"
+        if len(iata_codes) >= 2:
+            leg['arrival_place'] = f"{arr_city} ({iata_codes[1]})"
+
+        result.append(leg)
+
+    # Deduplicate by IATA codes — removes English duplicate sections
+    # Key: extract IATA codes from place strings like "Мадрид (MAD)" → "MAD"
+    def _iata_key(place: str) -> str:
+        m = re.search(r'\(([A-Z]{3})\)', place)
+        return m.group(1) if m else place
+
+    seen: set = set()
+    deduped = []
+    for leg in result:
+        dep_key = _iata_key(leg.get('departure_place', ''))
+        arr_key = _iata_key(leg.get('arrival_place', ''))
+        key = (dep_key, arr_key)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(leg)
+
+    return deduped
+
+
+def _looks_like_city(s: str) -> bool:
+    """Проверяет, похоже ли значение на название города."""
+    return bool(s and len(s) < 50 and re.match(r'^[A-Za-zА-Яа-яёЁÄÖÜäöüéàèùâêîôûç\s\-]+$', s.strip()))
+
+
+def _extract_iata_segments(lines: list) -> list:
+    """
+    Находит аэропортные сегменты по IATA-кодам вида (XXX).
+    Возвращает список dict: {iata, city, date, time} для каждого уникального кода.
+    """
+    SKIP_TIME = re.compile(
+        r'аэропорт|airport|прибыть|arrive|рекоменд|recommend|check.?in|выписки|issued',
+        re.IGNORECASE,
+    )
+    ROUTE_LINE = re.compile(
+        r'\([A-Z]{3}\).*\([A-Z]{3}\)',  # несколько IATA на одной строке — строка-маршрут
+    )
+    seen: set = set()
+    segments = []
+
+    for i, line in enumerate(lines):
+        # Пропускаем строки-маршруты (содержат несколько IATA-кодов)
+        if ROUTE_LINE.search(line):
+            continue
+
+        m = re.search(r'\(([A-Z]{3})\)', line)
+        if not m:
+            continue
+        iata = m.group(1)
+        if iata in seen:
+            continue
+        seen.add(iata)
+
+        # Название города: сначала предыдущие строки, потом текст до IATA
+        before = line[:m.start()].strip()
+        before = re.sub(
+            r'^(?:departure|arrival|departs?|arrives?|from|to|откуда|куда|вылет|прилёт)'
+            r'[\s:]+', '', before, flags=re.IGNORECASE,
+        ).strip()
+        city = ''
+        # Ищем заголовок сегмента вида "Город, Страна - Город2, Страна2" в ±5 строках
+        for k in range(max(0, i - 5), i):
+            seg_m = re.match(
+                r'^([А-ЯЁA-Z][^\d\n]{2,40}?),\s*[А-ЯЁA-Za-z]+\s*(?:-|—)',
+                lines[k], re.IGNORECASE,
+            )
+            if seg_m:
+                city = seg_m.group(1).strip()
+                break
+        if not city:
+            if i > 0 and _looks_like_city(lines[i - 1]):
+                city = lines[i - 1]
+        if not city and before and _looks_like_city(before):
+            city = before
+        if not city and before:
+            city = before
+        if not city and i > 1 and _looks_like_city(lines[i - 2]):
+            city = lines[i - 2]
+
+        # Время: сначала та же строка, потом ±3 строки (пропускаем «рекомендуемое» время)
+        time_val = None
+        check_lines = [line] + [lines[j] for j in range(max(0, i - 3), min(len(lines), i + 4)) if j != i]
+        for cline in check_lines:
+            if SKIP_TIME.search(cline):
+                continue
+            tm = re.search(r'\b(\d{1,2}:\d{2})\b', cline)
+            if tm:
+                time_val = tm.group(1)
+                break
+
+        # Дата: ищем в ±3 строках (пропускаем дату выписки билета)
+        date_val = None
+        for j in range(max(0, i - 3), min(len(lines), i + 4)):
+            cline = lines[j]
+            if SKIP_TIME.search(cline):
+                continue
+            for p in DATE_PATTERNS:
+                dm = re.search(p, cline, re.IGNORECASE)
+                if dm:
+                    date_val = normalize_date_str(dm.group(0))
+                    if date_val:
+                        break
+            if date_val:
+                break
+
+        segments.append({'iata': iata, 'city': city, 'date': date_val, 'time': time_val})
+
+    return segments
+
+
 def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
+    # Нормализуем неразрывные пробелы и мягкие дефисы
+    text = text.replace('\xa0', ' ').replace('\xad', '')
+
     data: Dict[str, Any] = {}
-    times = find_times(text)
 
-    # PNR / booking ref
-    pnr_match = re.search(r"\b([A-Z0-9]{6})\b", text)
-    if pnr_match:
-        data["pnr"] = pnr_match.group(1)
+    # ── PNR: сначала ищем по ключевому слову, потом fallback ──────────────
+    pnr_kw = re.search(
+        r"(?:pnr|booking\s*ref(?:erence)?|reservation\s*(?:code|number)|"
+        r"confirmation\s*(?:code|number)?|ref(?:erence)?\.?\s*(?:n[o°.]?|number|code)?|"
+        r"номер\s+брони(?:\s+\S+){0,3}|бронь\b)"
+        r"[:\s#\-]+([A-Z0-9]{5,8})\b",
+        text, re.IGNORECASE,
+    )
+    if pnr_kw:
+        data["pnr"] = pnr_kw.group(1).upper()
+    else:
+        # Fallback 1: табличный формат "LABEL\n...\n : VALUE" — ищем строку ": CODE"
+        for m in re.finditer(r'\n\s*:\s*([A-Z0-9]{5,8})\b', text):
+            c = m.group(1)
+            if re.search(r'[A-Z]', c) and re.search(r'\d', c) and not re.match(r'^[A-Z]{2}\d{3,4}$', c):
+                data["pnr"] = c
+                break
 
-    # Места/сиденья
+        # Fallback 2: любой смешанный буквенно-цифровой код в тексте
+        if not data.get("pnr"):
+            for m in re.finditer(r"\b([A-Z0-9]{5,8})\b", text):
+                c = m.group(1)
+                if re.search(r'[A-Z]', c) and re.search(r'\d', c) and not re.match(r"^[A-Z]{2}\d{3,4}$", c):
+                    data["pnr"] = c
+                    break
+
+    # ── Места/сиденья ──────────────────────────────────────────────────────
     seat_match = re.search(r"(?:seat|место)[:\s]+([A-Z]?\d+[A-Z]?)", text, re.IGNORECASE)
     if seat_match:
         data["seat"] = seat_match.group(1)
 
-    # Пассажиры
+    # ── Пассажиры ──────────────────────────────────────────────────────────
     pax_match = re.search(r"(\d+)\s+(?:passenger|adult|traveller|пассажир)", text, re.IGNORECASE)
     if pax_match:
         data["passengers"] = int(pax_match.group(1))
 
-    # Багаж
-    bag_match = re.search(r"(?:baggage|luggage|багаж)[:\s]+([^\n]{2,60})", text, re.IGNORECASE)
+    # ── Багаж ──────────────────────────────────────────────────────────────
+    # Сначала ищем конкретный формат: "1 x 20 кг", "1PC", "20KG", "23 kg"
+    bag_match = re.search(
+        r"\b(\d+\s*(?:x\s*\d+\s*)?(?:кг|kg|pc|pieces?|bag)(?:\s*\d+\s*(?:кг|kg))?)\b",
+        text, re.IGNORECASE,
+    )
+    if not bag_match:
+        # Fallback: ключевое слово + значение до конца строки (но не слишком длинное)
+        bag_match = re.search(
+            r"(?:^|\s)(?:багаж|baggage|luggage)\b[:\s]+([^\n]{2,40}?)(?:\s*[,;]|\s*$)",
+            text, re.IGNORECASE | re.MULTILINE,
+        )
     if bag_match:
         data["baggage"] = bag_match.group(1).strip()
 
-    # Дата отправления с ключевыми словами
-    dep_kw = r"departure|departs?|отправление|отправл|вылет|from date"
-    arr_kw = r"arrival|arrives?|прибытие|прибыт|прилёт|to date"
-    dep_date = find_date_after_keyword(text, dep_kw)
-    arr_date = find_date_after_keyword(text, arr_kw)
-
-    # Fallback к первым двум датам
-    if not dep_date or not arr_date:
-        dates = find_dates(text)
-        if not dep_date:
-            dep_date = first_or_none(dates, 0)
-        if not arr_date:
-            arr_date = first_or_none(dates, 1)
-
-    if dep_date:
-        data["departure_date"] = dep_date
-    if arr_date:
-        data["arrival_date"] = arr_date
-
-    if times:
-        data["departure_time"] = first_or_none(times, 0)
-        data["arrival_time"]   = first_or_none(times, 1)
-
+    # ── Специфика FLIGHT_TICKET ────────────────────────────────────────────
     if doc_type == "FLIGHT_TICKET":
-        flight_match = re.search(r"\b([A-Z]{2}\s*\d{3,4})\b", text)
-        if flight_match:
-            data["flight_number"] = flight_match.group(1).replace(" ", "")
-        dep_airport = re.search(r"(?:from|departure|отправление)[:\s]+([A-Z]{3})", text, re.IGNORECASE)
-        arr_airport = re.search(r"(?:to|arrival|прибытие)[:\s]+([A-Z]{3})", text, re.IGNORECASE)
-        if dep_airport:
-            data["departure_place"] = dep_airport.group(1)
-        if arr_airport:
-            data["arrival_place"] = arr_airport.group(1)
+        # Номер рейса: "PC1099" / "PC 1099" / "JU-571"
+        # Сначала по ключевому слову (точнее)
+        flight_kw = re.search(
+            r'(?:номер\s+рейса|flight\s+number|flight)[:\s]+([A-Z]{2})[\s\-]*(\d{3,4})\b',
+            text, re.IGNORECASE,
+        )
+        if flight_kw:
+            data["flight_number"] = flight_kw.group(1).upper() + flight_kw.group(2)
+        else:
+            flight_match = re.search(r"\b([A-Z]{2})[\s\-]*(\d{3,4})\b", text)
+            if flight_match:
+                data["flight_number"] = flight_match.group(1) + flight_match.group(2)
 
-    elif doc_type in ("TRAIN_TICKET", "BUS_TICKET"):
-        dep_match = re.search(r"(?:from|departure|abfahrt|откуда|отправление)[:\s]+([^\n]{2,50})", text, re.IGNORECASE)
-        arr_match = re.search(r"(?:to|arrival|ankunft|куда|прибытие)[:\s]+([^\n]{2,50})", text, re.IGNORECASE)
-        if dep_match:
-            data["departure_place"] = dep_match.group(1).strip()
-        if arr_match:
-            data["arrival_place"] = arr_match.group(1).strip()
+        # Класс / тариф
+        tariff_match = re.search(r"(?:class|класс|тариф)[:\s]+([^\n\d]{2,30})", text, re.IGNORECASE)
+        if tariff_match:
+            val = tariff_match.group(1).strip()
+            if val:
+                data["tariff"] = val
+
+        lines = [ln.strip() for ln in text.split('\n')]
+
+        # Подход 1: маршрутная строка вида "CITY FLIGHT CL DATE HHMM"
+        itinerary = _extract_airline_itinerary(lines)
+        if itinerary:
+            if not data.get('flight_number'):
+                data['flight_number'] = itinerary['flight_no']
+            if itinerary['dep_city']:
+                data['departure_place'] = itinerary['dep_city']
+            if itinerary['dep_date']:
+                data['departure_date'] = itinerary['dep_date']
+            if itinerary['dep_time']:
+                data['departure_time'] = itinerary['dep_time']
+            if itinerary['arr_city']:
+                data['arrival_place'] = itinerary['arr_city']
+            if itinerary['arr_date']:
+                data['arrival_date'] = itinerary['arr_date']
+            if itinerary['arr_time']:
+                data['arrival_time'] = itinerary['arr_time']
+
+        # Подход 2: IATA-коды вида "(SAW)" / "(MAD)" (Pegasus, Ryanair и т.п.)
+        if not data.get('departure_date') or not data.get('arrival_date'):
+            segments = _extract_iata_segments(lines)
+
+            if len(segments) >= 1:
+                seg = segments[0]
+                if seg['city'] and not data.get('departure_place'):
+                    data["departure_place"] = f"{seg['city']} ({seg['iata']})"
+                if seg['date'] and not data.get('departure_date'):
+                    data["departure_date"] = seg['date']
+                if seg['time'] and not data.get('departure_time'):
+                    data["departure_time"] = seg['time']
+
+            if len(segments) >= 2:
+                seg = segments[1]
+                if seg['city'] and not data.get('arrival_place'):
+                    data["arrival_place"] = f"{seg['city']} ({seg['iata']})"
+                if seg['date'] and not data.get('arrival_date'):
+                    data["arrival_date"] = seg['date']
+                if seg['time'] and not data.get('arrival_time'):
+                    data["arrival_time"] = seg['time']
+
+        # Fallback дат/времён через ключевые слова (для EN-билетов без IATA)
+        if not data.get("departure_date") or not data.get("arrival_date"):
+            dep_kw = r"departure|departs?|отправление|отправл|вылет|from\s*date|\bstd\b"
+            arr_kw = r"arrival|arrives?|прибытие|прибыт|прилёт|to\s*date|\bsta\b"
+            if not data.get("departure_date"):
+                data["departure_date"] = find_date_after_keyword(text, dep_kw)
+            if not data.get("arrival_date"):
+                data["arrival_date"] = find_date_after_keyword(text, arr_kw)
+            if not data.get("departure_date") or not data.get("arrival_date"):
+                dates = find_dates(text)
+                if not data.get("departure_date"):
+                    data["departure_date"] = first_or_none(dates, 0)
+                if not data.get("arrival_date"):
+                    data["arrival_date"] = first_or_none(dates, 1)
+            if not data.get("departure_time") or not data.get("arrival_time"):
+                dep_kw = r"departure|departs?|отправление|отправл|вылет|from\s*date|\bstd\b"
+                arr_kw = r"arrival|arrives?|прибытие|прибыт|прилёт|to\s*date|\bsta\b"
+                if not data.get("departure_time"):
+                    data["departure_time"] = find_time_after_keyword(text, dep_kw)
+                if not data.get("arrival_time"):
+                    data["arrival_time"] = find_time_after_keyword(text, arr_kw)
+            if not data.get("departure_time") or not data.get("arrival_time"):
+                times = find_times(text)
+                if not data.get("departure_time"):
+                    data["departure_time"] = first_or_none(times, 0)
+                if not data.get("arrival_time"):
+                    data["arrival_time"] = first_or_none(times, 1)
+
+        # Fallback аэропортов через ключевые слова
+        if not data.get("departure_place"):
+            dep_place = _extract_airport(text, r"from|departure|departs?|origin|откуда|вылет из")
+            if dep_place:
+                data["departure_place"] = dep_place
+        if not data.get("arrival_place"):
+            arr_place = _extract_airport(text, r"to|arrival|arrives?|destination|куда|прилёт в")
+            if arr_place:
+                data["arrival_place"] = arr_place
+
+    # ── Специфика TRAIN_TICKET / BUS_TICKET ───────────────────────────────
+    else:
+        dep_kw = r"departure|departs?|отправление|отправл|вылет|from\s*date|\bstd\b"
+        arr_kw = r"arrival|arrives?|прибытие|прибыт|прилёт|to\s*date|\bsta\b"
+        dep_date = find_date_after_keyword(text, dep_kw)
+        arr_date = find_date_after_keyword(text, arr_kw)
+        if not dep_date or not arr_date:
+            dates = find_dates(text)
+            if not dep_date:
+                dep_date = first_or_none(dates, 0)
+            if not arr_date:
+                arr_date = first_or_none(dates, 1)
+        if dep_date:
+            data["departure_date"] = dep_date
+        if arr_date:
+            data["arrival_date"] = arr_date
+
+        dep_time = find_time_after_keyword(text, dep_kw)
+        arr_time = find_time_after_keyword(text, arr_kw)
+        if not dep_time or not arr_time:
+            times = find_times(text)
+            if not dep_time:
+                dep_time = first_or_none(times, 0)
+            if not arr_time:
+                arr_time = first_or_none(times, 1)
+        if dep_time:
+            data["departure_time"] = dep_time
+        if arr_time:
+            data["arrival_time"] = arr_time
+
+        if doc_type in ("TRAIN_TICKET", "BUS_TICKET"):
+            dep_match = re.search(
+                r"(?:from|departure|abfahrt|откуда|отправление)[:\s]+([^\n]{2,50})",
+                text, re.IGNORECASE,
+            )
+            arr_match = re.search(
+                r"(?:to|arrival|ankunft|куда|прибытие)[:\s]+([^\n]{2,50})",
+                text, re.IGNORECASE,
+            )
+            if dep_match:
+                data["departure_place"] = dep_match.group(1).strip()
+            if arr_match:
+                data["arrival_place"] = arr_match.group(1).strip()
 
     return data
+
+
+def _extract_airport(text: str, keyword_re: str) -> Optional[str]:
+    """
+    Извлекает аэропорт/город из строки, содержащей ключевое слово.
+    Поддерживает форматы:
+      - "Istanbul Sabiha Gokcen (SAW)"  → "Istanbul Sabiha Gokcen (SAW)"
+      - "SAW Istanbul"                  → "Istanbul (SAW)"
+      - keyword: SAW                    → "SAW"
+    """
+    for line in text.split('\n'):
+        if not re.search(keyword_re, line, re.IGNORECASE):
+            continue
+
+        # Формат "City... (IATA)" — город начинается с заглавной буквы
+        m = re.search(
+            r'([A-Z][A-Za-z]+(?:\s+[A-Za-z]+){0,4})\s*\(\s*([A-Z]{3})\s*\)',
+            line,
+        )
+        if m:
+            return f"{m.group(1).strip()} ({m.group(2)})"
+
+        # Формат "IATA City"
+        m = re.search(r'\b([A-Z]{3})\s+([A-Z][A-Za-z]+(?:\s+[A-Za-z]+){0,3})', line)
+        if m:
+            return f"{m.group(2).strip()} ({m.group(1)})"
+
+        # Fallback: просто 3-буквенный код на строке
+        m = re.search(r'\b([A-Z]{3})\b', line)
+        if m:
+            return m.group(1)
+
+    return None
 
 
 def extract_car_rental_data(text: str) -> Dict[str, Any]:
@@ -575,17 +1027,26 @@ def extract_widget_data(text: str, doc_type: str) -> Dict[str, Any]:
     return {}
 
 
-def parse_document(file_path: str, mime_type: str) -> Tuple[str, float, Dict[str, Any]]:
+def parse_document(file_path: str, mime_type: str) -> Tuple[str, float, List[Dict[str, Any]]]:
     """
     Основной метод: парсит файл, определяет тип, извлекает данные.
-    Возвращает (doc_type, confidence, extracted_data).
+    Возвращает (doc_type, confidence, list_of_segments).
+    Для многосегментных билетов list_of_segments содержит по одному dict на сегмент.
+    Для всех остальных документов список из одного элемента.
     """
     text = extract_text(file_path, mime_type)
 
     if not text.strip():
-        return "UNKNOWN", 0.0, {}
+        return "UNKNOWN", 0.0, [{}]
 
     doc_type, confidence = determine_doc_type(text)
     extracted = extract_widget_data(text, doc_type)
 
-    return doc_type, confidence, extracted
+    if doc_type == "FLIGHT_TICKET":
+        pnr = extracted.get('pnr')
+        lines = [ln.strip() for ln in text.split('\n')]
+        legs = _extract_flight_legs(lines, pnr=pnr)
+        if len(legs) >= 2:
+            return doc_type, confidence, legs
+
+    return doc_type, confidence, [extracted]
