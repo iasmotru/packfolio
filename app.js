@@ -616,13 +616,13 @@ function applyTimeMask(input) {
 
 // Поля для каждого типа документа (отображаемые в виджете)
 // Поля, которые в мини-карточке показываются только если заполнены
-const OPTIONAL_MINI_FIELDS = new Set(['seat','baggage','tariff','passengers']);
+const OPTIONAL_MINI_FIELDS = new Set(['seat','baggage','tariff']);
 
 const WIDGET_FIELDS = {
   HOTEL_BOOKING:      ['hotel_name','address','check_in','check_out','nights','room_type','guests'],
-  FLIGHT_TICKET:      ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','baggage','tariff'],
-  TRAIN_TICKET:       ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
-  BUS_TICKET:         ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
+  FLIGHT_TICKET:      ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','baggage','tariff'],
+  TRAIN_TICKET:       ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','tariff'],
+  BUS_TICKET:         ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','tariff'],
   // departure_time / arrival_time хранятся в data, но не показываются отдельно
   CAR_RENTAL:         ['car_model','plate','pickup_date','pickup_time','dropoff_date','dropoff_time'],
   MEDICAL_INSURANCE:  ['days','coverage_amount','start_date','end_date'],
@@ -1124,27 +1124,12 @@ function buildDocMiniCard(doc) {
 
   const card = el('div', 'doc-card');
 
-  // Subtitle for the header
-  let subtitle = '';
-  if (doc.doc_type === 'HOTEL_BOOKING') {
-    subtitle = data.hotel_name || '';
-  } else if (['FLIGHT_TICKET','TRAIN_TICKET','BUS_TICKET'].includes(doc.doc_type)) {
-    subtitle = [data.departure_place, data.arrival_place].filter(Boolean).join(' → ');
-  } else if (doc.doc_type === 'CAR_RENTAL') {
-    subtitle = data.car_model || '';
-  } else if (doc.doc_type === 'MEDICAL_INSURANCE') {
-    subtitle = data.coverage_amount ? `Покрытие: ${data.coverage_amount}` : '';
-  } else if (doc.doc_type === 'PASSPORT') {
-    subtitle = [data.given_names, data.surname].filter(Boolean).join(' ');
-  }
-
   // Header — click opens full detail
   const header = el('div', 'doc-card-header doc-card-header-clickable');
   header.innerHTML = `
     <div class="doc-type-badge ${info.color}">${info.icon}</div>
     <div class="doc-info">
       <div class="doc-title">${escHtml(doc.title)}</div>
-      ${subtitle ? `<div class="doc-subtitle">${escHtml(subtitle)}</div>` : `<div class="doc-subtitle">${info.label}</div>`}
     </div>
     <div class="doc-card-arrow">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -1334,6 +1319,24 @@ async function renderDocsPage() {
   await applyDocFilters(list);
 }
 
+function docTravelDate(doc) {
+  const data = doc.widget && doc.widget.data || {};
+  const raw = data.departure_date || data.check_in || data.departure || null;
+  if (!raw) return Infinity;
+  // YYYY-MM-DD
+  let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+  // DD.MM.YYYY or DD.MM.YY
+  m = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+  if (m) {
+    let [, d, mo, y] = m;
+    if (y.length === 2) y = '20' + y;
+    return new Date(+y, +mo - 1, +d).getTime();
+  }
+  const t = Date.parse(raw);
+  return isNaN(t) ? Infinity : t;
+}
+
 async function applyDocFilters(listEl) {
   listEl = listEl || qs('#doc-list');
   if (!listEl) return;
@@ -1354,6 +1357,10 @@ async function applyDocFilters(listEl) {
     let docs = await API.get(`/api/documents?${params}`);
     if (isTransferFilter && docs) {
       docs = docs.filter(d => TRANSFER_TYPES.has(d.doc_type));
+    }
+
+    if (docs && docs.length) {
+      docs.sort((a, b) => docTravelDate(a) - docTravelDate(b));
     }
 
     listEl.innerHTML = '';
@@ -1455,6 +1462,21 @@ function renderDocDetailBody(body, doc) {
     openBtn.onclick = () => window.open(`${CONFIG.API_BASE}/api/documents/${doc.id}/file`, '_blank');
     actions.appendChild(openBtn);
   }
+
+  const renameBtn = el('button', 'btn btn-secondary', '');
+  renameBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Переименовать`;
+  renameBtn.onclick = () => {
+    const newTitle = prompt('Новое название:', doc.title);
+    if (!newTitle || newTitle.trim() === doc.title) return;
+    API.put(`/api/documents/${doc.id}`, { title: newTitle.trim() }).then(() => {
+      doc.title = newTitle.trim();
+      // Update modal header
+      const header = renameBtn.closest('.modal-sheet')?.querySelector('.modal-title');
+      if (header) header.textContent = `${info.icon} ${doc.title}`;
+      showToast('Переименовано');
+    }).catch(e => showToast('Ошибка: ' + e.message));
+  };
+  actions.appendChild(renameBtn);
 
   const replaceBtn = el('button', 'btn btn-secondary', '');
   replaceBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Заменить`;
@@ -1738,7 +1760,17 @@ async function handleFileSelected(file, body) {
 
   let doc;
   try {
-    doc = await API.postForm('/api/documents', fd);
+    const uploadResult = await API.postForm('/api/documents', fd);
+    const isMulti = Array.isArray(uploadResult);
+    doc = isMulti ? uploadResult[0] : uploadResult;
+
+    if (isMulti) {
+      Modal.close();
+      showToast(`Создано ${uploadResult.length} карточки рейсов`);
+      await loadAllData();
+      await applyDocFilters();
+      return;
+    }
   } catch (e) {
     showToast('Ошибка загрузки: ' + e.message);
     renderUploadStep1(body);
