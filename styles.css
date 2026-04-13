@@ -185,6 +185,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 24px;
+  line-height: 1;
 }
 
 /* Активный таб — только цвет акцента (из Figma: active label #464DF5) */
@@ -478,6 +480,7 @@ html, body {
   margin: 0 var(--gap);
   margin-top: 10px;
   overflow: hidden;
+  flex-shrink: 0;
   transition: border-color .12s;
 }
 .doc-card:first-child { margin-top: 14px; }
@@ -704,6 +707,7 @@ html, body {
   overflow-y: auto;
   padding: var(--gap);
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;

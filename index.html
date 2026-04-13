@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
 
@@ -35,53 +35,22 @@
     <nav class="bottom-nav">
 
       <button class="nav-btn active" data-tab="home" onclick="App.navigate('home')">
-        <span class="nav-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path d="M3 12L12 3L21 12V21H15V15H9V21H3V12Z"
-              stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
+        <span class="nav-icon">🏠</span>
         <span>Главная</span>
       </button>
 
       <button class="nav-btn" data-tab="trips" onclick="App.navigate('trips')">
-        <span class="nav-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path d="M22 16.5H2M6.5 7L2 16.5M17.5 7L22 16.5M6.5 7H17.5M6.5 7L12 3.5L17.5 7"
-              stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
+        <span class="nav-icon">✈️</span>
         <span>Поездки</span>
       </button>
 
       <button class="nav-btn" data-tab="docs" onclick="App.navigate('docs')">
-        <span class="nav-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
-              stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M14 2V8H20M16 13H8M16 17H8M10 9H8"
-              stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
+        <span class="nav-icon">📄</span>
         <span>Документы</span>
       </button>
 
       <button class="nav-btn" data-tab="calendar" onclick="App.navigate('calendar')">
-        <span class="nav-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="4" width="18" height="18" rx="3"
-              stroke="currentColor" stroke-width="1.8"/>
-            <path d="M3 10H21M8 2V6M16 2V6"
-              stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            <circle cx="8" cy="15" r="1.2" fill="currentColor"/>
-            <circle cx="12" cy="15" r="1.2" fill="currentColor"/>
-            <circle cx="16" cy="15" r="1.2" fill="currentColor"/>
-          </svg>
-        </span>
+        <span class="nav-icon">📅</span>
         <span>Календарь</span>
       </button>
 
@@ -100,6 +69,6 @@
   </svg>
 </button>
 
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
