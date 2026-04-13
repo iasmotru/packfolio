@@ -101,15 +101,17 @@ def auth_telegram(body: AuthRequest, db: Session = Depends(get_db)):
     Валидирует Telegram WebApp initData, создаёт/обновляет пользователя,
     возвращает Bearer JWT токен.
     """
-    if not body.init_data:
-        raise HTTPException(status_code=400, detail="initData не передан")
-
-    # В dev-режиме без BOT_TOKEN — пропускаем проверку HMAC
+    # В dev-режиме без BOT_TOKEN — пропускаем проверку HMAC; пустой initData = dev user 1
     if ENV == "dev" and not BOT_TOKEN:
-        try:
-            user_data = validate_init_data_dev(body.init_data)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Ошибка парсинга initData: {e}")
+        if not body.init_data:
+            user_data = {"id": 1, "first_name": "Dev", "last_name": "User", "username": "devuser"}
+        else:
+            try:
+                user_data = validate_init_data_dev(body.init_data)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Ошибка парсинга initData: {e}")
+    elif not body.init_data:
+        raise HTTPException(status_code=400, detail="initData не передан")
     else:
         try:
             user_data = validate_telegram_init_data(body.init_data)

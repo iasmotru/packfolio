@@ -33,6 +33,7 @@ const State = {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   })(),
   calSelectedDay: null,
+  calActiveTripId: null,
   calEvents: [],
 };
 
@@ -616,13 +617,13 @@ function applyTimeMask(input) {
 
 // Поля для каждого типа документа (отображаемые в виджете)
 // Поля, которые в мини-карточке показываются только если заполнены
-const OPTIONAL_MINI_FIELDS = new Set(['seat','baggage','tariff']);
+const OPTIONAL_MINI_FIELDS = new Set(['seat','baggage','tariff','passengers']);
 
 const WIDGET_FIELDS = {
   HOTEL_BOOKING:      ['hotel_name','address','check_in','check_out','nights','room_type','guests'],
-  FLIGHT_TICKET:      ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','baggage','tariff'],
-  TRAIN_TICKET:       ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','tariff'],
-  BUS_TICKET:         ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','tariff'],
+  FLIGHT_TICKET:      ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','baggage','tariff'],
+  TRAIN_TICKET:       ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
+  BUS_TICKET:         ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
   // departure_time / arrival_time хранятся в data, но не показываются отдельно
   CAR_RENTAL:         ['car_model','plate','pickup_date','pickup_time','dropoff_date','dropoff_time'],
   MEDICAL_INSURANCE:  ['days','coverage_amount','start_date','end_date'],
@@ -1101,23 +1102,24 @@ function openTripDetail(trip) {
 
       if (docs?.length) {
         docs.forEach(doc => {
-          const miniCard = buildDocMiniCard(doc);
+          const miniCard = buildDocMiniCard(doc, true);
           miniCard.style.margin = '0 0 8px 0';
           body.appendChild(miniCard);
         });
       } else {
         body.appendChild(el('div', '', `<div style="color:var(--text-hint);text-align:center;padding:24px;font-size:14px;background:var(--bg-elevated);border-radius:var(--radius-sm);border:1px solid var(--border)">Нет прикреплённых документов</div>`));
       }
-    }).catch(() => {
+    }).catch((err) => {
       const loader = body.querySelector('.loader');
       if (loader) loader.remove();
+      console.error('openTripDetail error:', err);
     });
   });
 }
 
 // ── ДОКУМЕНТЫ ──
 
-function buildDocMiniCard(doc) {
+function buildDocMiniCard(doc, showAllFields = false) {
   const info = getDocInfo(doc.doc_type);
   const data = doc.widget?.data || {};
   const fields = WIDGET_FIELDS[doc.doc_type] || [];
@@ -1140,9 +1142,9 @@ function buildDocMiniCard(doc) {
   header.onclick = () => openDocDetail(doc);
   card.appendChild(header);
 
-  // Editable fields grid — optional fields only if filled
+  // Editable fields grid — optional fields only if filled (unless showAllFields)
   const visibleFields = fields.filter(key =>
-    !OPTIONAL_MINI_FIELDS.has(key) || (data[key] !== null && data[key] !== undefined && data[key] !== '')
+    showAllFields || !OPTIONAL_MINI_FIELDS.has(key) || (data[key] !== null && data[key] !== undefined && data[key] !== '')
   );
   if (visibleFields.length) {
     card.appendChild(el('div', 'doc-card-divider'));
@@ -1319,24 +1321,6 @@ async function renderDocsPage() {
   await applyDocFilters(list);
 }
 
-function docTravelDate(doc) {
-  const data = doc.widget && doc.widget.data || {};
-  const raw = data.departure_date || data.check_in || data.departure || null;
-  if (!raw) return Infinity;
-  // YYYY-MM-DD
-  let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return new Date(+m[1], +m[2] - 1, +m[3]).getTime();
-  // DD.MM.YYYY or DD.MM.YY
-  m = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
-  if (m) {
-    let [, d, mo, y] = m;
-    if (y.length === 2) y = '20' + y;
-    return new Date(+y, +mo - 1, +d).getTime();
-  }
-  const t = Date.parse(raw);
-  return isNaN(t) ? Infinity : t;
-}
-
 async function applyDocFilters(listEl) {
   listEl = listEl || qs('#doc-list');
   if (!listEl) return;
@@ -1357,10 +1341,6 @@ async function applyDocFilters(listEl) {
     let docs = await API.get(`/api/documents?${params}`);
     if (isTransferFilter && docs) {
       docs = docs.filter(d => TRANSFER_TYPES.has(d.doc_type));
-    }
-
-    if (docs && docs.length) {
-      docs.sort((a, b) => docTravelDate(a) - docTravelDate(b));
     }
 
     listEl.innerHTML = '';
@@ -1470,9 +1450,8 @@ function renderDocDetailBody(body, doc) {
     if (!newTitle || newTitle.trim() === doc.title) return;
     API.put(`/api/documents/${doc.id}`, { title: newTitle.trim() }).then(() => {
       doc.title = newTitle.trim();
-      // Update modal header
-      const header = renameBtn.closest('.modal-sheet')?.querySelector('.modal-title');
-      if (header) header.textContent = `${info.icon} ${doc.title}`;
+      const modalTitle = renameBtn.closest('.modal-sheet')?.querySelector('.modal-title');
+      if (modalTitle) modalTitle.textContent = `${info.icon} ${doc.title}`;
       showToast('Переименовано');
     }).catch(e => showToast('Ошибка: ' + e.message));
   };
@@ -1760,17 +1739,7 @@ async function handleFileSelected(file, body) {
 
   let doc;
   try {
-    const uploadResult = await API.postForm('/api/documents', fd);
-    const isMulti = Array.isArray(uploadResult);
-    doc = isMulti ? uploadResult[0] : uploadResult;
-
-    if (isMulti) {
-      Modal.close();
-      showToast(`Создано ${uploadResult.length} карточки рейсов`);
-      await loadAllData();
-      await applyDocFilters();
-      return;
-    }
+    doc = await API.postForm('/api/documents', fd);
   } catch (e) {
     showToast('Ошибка загрузки: ' + e.message);
     renderUploadStep1(body);
@@ -1983,8 +1952,55 @@ async function renderCalendarPage() {
   ]);
   State.calEvents = calData?.events || [];
 
+  renderCalendarTripFilters(c);
   renderCalendarGrid(c);
   renderEventsList(c);
+}
+
+function renderCalendarTripFilters(container) {
+  if (!State.trips.length) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const upcoming = State.trips
+    .filter(t => t.start_date && t.start_date >= today)
+    .sort((a, b) => a.start_date < b.start_date ? -1 : 1)[0];
+
+  const chips = el('div', 'filter-chips');
+  chips.style.padding = '8px var(--gap) 0';
+
+  const jumpToTrip = async (trip) => {
+    const [y, m] = trip.start_date.split('-');
+    State.calMonth = `${y}-${m.padStart(2,'0')}`;
+    State.calSelectedDay = null;
+    State.calActiveTripId = trip.id;
+    const data = await API.get(`/api/calendar?month=${State.calMonth}`).catch(() => ({ events: [] }));
+    State.calEvents = data?.events || [];
+    const c = qs('#page-content');
+    c.innerHTML = '';
+    renderCalendarTripFilters(c);
+    renderCalendarGrid(c);
+    renderEventsList(c);
+  };
+
+  if (upcoming) {
+    const nearBtn = el('button', 'chip', '⭐ Ближайшая поездка');
+    if (State.calActiveTripId === upcoming.id) nearBtn.classList.add('active');
+    nearBtn.onclick = () => jumpToTrip(upcoming);
+    chips.appendChild(nearBtn);
+  }
+
+  State.trips
+    .filter(t => t.start_date)
+    .sort((a, b) => a.start_date < b.start_date ? -1 : 1)
+    .forEach(trip => {
+      const btn = el('button', 'chip', escHtml(trip.title));
+      if (State.calActiveTripId === trip.id) btn.classList.add('active');
+      btn.onclick = () => jumpToTrip(trip);
+      chips.appendChild(btn);
+    });
+
+  container.appendChild(chips);
 }
 
 function renderCalendarGrid(container) {
@@ -2160,11 +2176,13 @@ async function shiftMonth(delta, container) {
   const d = new Date(y, m - 1 + delta, 1);
   State.calMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   State.calSelectedDay = null;
+  State.calActiveTripId = null;
   container.innerHTML = '';
   try {
     const data = await API.get(`/api/calendar?month=${State.calMonth}`);
     State.calEvents = data.events || [];
   } catch (_) {}
+  renderCalendarTripFilters(container);
   renderCalendarGrid(container);
   renderEventsList(container);
 }
@@ -2211,7 +2229,7 @@ const App = {
     this.navigate(location.hash.replace('#', '') || 'home');
     window.addEventListener('hashchange', () => {
       const tab = location.hash.replace('#', '') || 'home';
-      this.navigate(tab, true);
+      if (tab !== State.currentTab) this.navigate(tab, true);
     });
   },
 
