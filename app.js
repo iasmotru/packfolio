@@ -9,9 +9,7 @@
 
 const CONFIG = {
   // В разработке меняйте на http://localhost:8000
-  API_BASE: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000'
-    : '',
+  API_BASE: '',
 };
 
 // ──────────────────────────────────────────────
@@ -711,8 +709,8 @@ function renderHomePage() {
   greeting.style.cssText = 'padding:20px var(--gap) 0';
   const name = State.user?.first_name || '';
   greeting.innerHTML = `
-    <div style="font-size:12px;font-weight:500;color:var(--text-hint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Добро пожаловать${name ? ', ' + escHtml(name) : ''}</div>
-    <div style="font-size:28px;font-weight:400;letter-spacing:0">Ваши документы</div>
+    <div style="font-size:12px;font-weight:500;color:var(--text-hint);letter-spacing:.6px;margin-bottom:6px">Добро пожаловать${name ? ', ' + escHtml(name) : ''}</div>
+    <div style="font-size:28px;font-weight:400;letter-spacing:0">Готовы к путешествиям?</div>
   `;
   c.appendChild(greeting);
 
@@ -721,8 +719,31 @@ function renderHomePage() {
     .filter(t => t.end_date && t.end_date >= new Date().toISOString().slice(0,10))
     .sort((a,b) => (a.start_date||'') < (b.start_date||'') ? -1 : 1)[0];
 
+  const actRow = el('div', '');
+  actRow.style.cssText = 'display:flex;gap:10px;padding:0 var(--gap)';
+
+  const addDocBtn = el('button', 'btn btn-primary', '');
+  addDocBtn.style.flex = '1';
+  addDocBtn.innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M12 5V19M5 12H19" stroke="white" stroke-width="2" stroke-linecap="round"/>
+    </svg> Документ`;
+  addDocBtn.onclick = () => { App.navigate('docs'); setTimeout(openUploadModal, 100); };
+
+  const addTripBtn = el('button', 'btn btn-secondary', '');
+  addTripBtn.style.flex = '1';
+  addTripBtn.innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg> Поездка`;
+  addTripBtn.onclick = () => { App.navigate('trips'); setTimeout(openTripForm, 100); };
+
+  actRow.appendChild(addDocBtn);
+  actRow.appendChild(addTripBtn);
+
   if (upcoming) {
     const label = el('div', 'section-title', 'Ближайшая поездка');
+    label.style.textTransform = 'none';
     c.appendChild(label);
 
     const heroCard = el('div', 'widget-hero-card');
@@ -747,64 +768,23 @@ function renderHomePage() {
     `;
     heroCard.onclick = () => openTripDetail(upcoming);
     c.appendChild(heroCard);
+    actRow.style.marginTop = '12px';
   }
+
+  c.appendChild(actRow);
 
   // Последние документы
   const recentDocs = State.documents.slice(0, 3);
   if (recentDocs.length) {
     const label2 = el('div', 'section-title', 'Последние документы');
+    label2.style.textTransform = 'none';
     c.appendChild(label2);
-    recentDocs.forEach(doc => c.appendChild(buildDocMiniCard(doc)));
+    recentDocs.forEach((doc, i) => {
+      const card = buildDocMiniCard(doc);
+      if (i === 0) card.style.marginTop = '0';
+      c.appendChild(card);
+    });
   }
-
-  // Быстрые действия
-  const actLabel = el('div', 'section-title', 'Быстрые действия');
-  c.appendChild(actLabel);
-
-  const actRow = el('div', '');
-  actRow.style.cssText = 'display:flex;gap:10px;padding:0 var(--gap)';
-
-  const addDocBtn = el('button', 'btn btn-primary', '');
-  addDocBtn.style.flex = '1';
-  addDocBtn.innerHTML = `
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <path d="M12 5V19M5 12H19" stroke="white" stroke-width="2" stroke-linecap="round"/>
-    </svg> Документ`;
-  addDocBtn.onclick = () => { App.navigate('docs'); setTimeout(openUploadModal, 100); };
-
-  const addTripBtn = el('button', 'btn btn-secondary', '');
-  addTripBtn.style.flex = '1';
-  addTripBtn.innerHTML = `
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <path d="M22 16.5H2M6.5 7L2 16.5M17.5 7L22 16.5M6.5 7H17.5M6.5 7L12 3.5L17.5 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg> Поездка`;
-  addTripBtn.onclick = () => { App.navigate('trips'); setTimeout(openTripForm, 100); };
-
-  actRow.appendChild(addDocBtn);
-  actRow.appendChild(addTripBtn);
-  c.appendChild(actRow);
-
-  // Статистика
-  const stats = el('div', '');
-  stats.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:12px var(--gap) 0';
-
-  [
-    { label: 'Поездок',    value: State.trips.length },
-    { label: 'Документов', value: State.documents.length },
-    { label: 'Тегов',      value: State.tags.length },
-  ].forEach(({ label, value }) => {
-    const cell = el('div', '');
-    cell.style.cssText = `
-      background:var(--bg-card);border-radius:var(--radius);border:1px solid var(--border);
-      padding:16px 12px;text-align:center;
-    `;
-    cell.innerHTML = `
-      <div style="font-size:28px;font-weight:400;color:var(--accent)">${value}</div>
-      <div style="font-size:11px;font-weight:500;color:var(--text-hint);margin-top:4px;text-transform:uppercase;letter-spacing:.4px">${label}</div>
-    `;
-    stats.appendChild(cell);
-  });
-  c.appendChild(stats);
 }
 
 // ── ПОЕЗДКИ ──
@@ -2058,12 +2038,33 @@ function renderCalendarGrid(container) {
     return { inTrip: false };
   };
 
-  // Пустые ячейки до начала месяца
-  for (let i = 0; i < startOffset; i++) {
-    grid.appendChild(el('div', 'cal-cell empty'));
+  // Числа предыдущего месяца
+  const prevMonthLastDay = new Date(year, month - 1, 0).getDate();
+  const prevYear  = month === 1 ? year - 1 : year;
+  const prevMonth = month === 1 ? 12 : month - 1;
+  let cellIndex = 0;
+
+  const rowClasses = (idx) => [
+    idx % 7 === 0 ? 'row-start' : '',
+    idx % 7 === 6 ? 'row-end'   : '',
+  ];
+
+  for (let i = 0; i < startOffset; i++, cellIndex++) {
+    const d = prevMonthLastDay - startOffset + 1 + i;
+    const dateStr  = `${prevYear}-${String(prevMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const tripInfo = getTripInfo(dateStr);
+    const classes  = ['cal-cell', 'out-of-month',
+      tripInfo.inTrip  ? 'in-trip'    : '',
+      tripInfo.isStart ? 'trip-start' : '',
+      tripInfo.isEnd   ? 'trip-end'   : '',
+      ...rowClasses(cellIndex),
+    ].filter(Boolean).join(' ');
+    const cell = el('div', classes);
+    cell.appendChild(el('span', 'cal-day-num', String(d)));
+    grid.appendChild(cell);
   }
 
-  for (let d = 1; d <= lastDay.getDate(); d++) {
+  for (let d = 1; d <= lastDay.getDate(); d++, cellIndex++) {
     const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isToday    = today.getFullYear() === year && today.getMonth() + 1 === month && today.getDate() === d;
     const isSelected = State.calSelectedDay === dateStr;
@@ -2078,6 +2079,7 @@ function renderCalendarGrid(container) {
       tripInfo.inTrip  ? 'in-trip'    : '',
       tripInfo.isStart ? 'trip-start' : '',
       tripInfo.isEnd   ? 'trip-end'   : '',
+      ...rowClasses(cellIndex),
     ].filter(Boolean).join(' ');
 
     const cell = el('div', classes);
@@ -2096,6 +2098,25 @@ function renderCalendarGrid(container) {
       if (!isSelected) cell.classList.add('selected');
     };
 
+    grid.appendChild(cell);
+  }
+
+  // Числа следующего месяца
+  const nextYear  = month === 12 ? year + 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const totalCells = startOffset + lastDay.getDate();
+  const remainder  = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let d = 1; d <= remainder; d++, cellIndex++) {
+    const dateStr  = `${nextYear}-${String(nextMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const tripInfo = getTripInfo(dateStr);
+    const classes  = ['cal-cell', 'out-of-month',
+      tripInfo.inTrip  ? 'in-trip'    : '',
+      tripInfo.isStart ? 'trip-start' : '',
+      tripInfo.isEnd   ? 'trip-end'   : '',
+      ...rowClasses(cellIndex),
+    ].filter(Boolean).join(' ');
+    const cell = el('div', classes);
+    cell.appendChild(el('span', 'cal-day-num', String(d)));
     grid.appendChild(cell);
   }
 
@@ -2192,12 +2213,14 @@ async function shiftMonth(delta, container) {
 // ──────────────────────────────────────────────
 
 async function loadAllData() {
-  const [trips, tags] = await Promise.all([
+  const [trips, tags, documents] = await Promise.all([
     API.get('/api/trips').catch(() => []),
     API.get('/api/tags').catch(() => []),
+    API.get('/api/documents').catch(() => []),
   ]);
-  State.trips = trips || [];
-  State.tags  = tags  || [];
+  State.trips     = trips     || [];
+  State.tags      = tags      || [];
+  State.documents = documents || [];
 }
 
 // ──────────────────────────────────────────────

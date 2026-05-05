@@ -97,6 +97,7 @@ html, body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-top: calc(var(--header-h) + 8px);
   padding-bottom: calc(var(--nav-h) + 16px);
   scrollbar-width: none;
 }
@@ -106,26 +107,39 @@ html, body {
    Шапка
    ────────────────────────────────────────────── */
 
+.top-bar-wrap {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  display: flex;
+  justify-content: center;
+  z-index: 20;
+  pointer-events: none;
+}
+
 .top-bar {
-  height: var(--header-h);
+  width: 312px;
   display: flex;
   align-items: center;
-  padding: 0 var(--gap);
+  padding: 12px 20px;
   gap: 12px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  flex-shrink: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  box-shadow: var(--shadow);
+  pointer-events: all;
 }
 
 .top-bar h1 {
-  /* Heading 1: 28px Regular из Figma */
-  font-size: 28px;
+  font-size: 16px;
   font-weight: 400;
   flex: 1;
   letter-spacing: 0;
+  text-align: center;
 }
 
 /* ──────────────────────────────────────────────
@@ -629,7 +643,6 @@ html, body {
   border-radius: var(--radius-lg);
   padding: 20px 16px;
   margin: 0 var(--gap);
-  margin-top: 14px;
   border: 1px solid rgba(70,77,245,0.3);
   box-shadow: var(--shadow);
 }
@@ -1044,7 +1057,8 @@ html, body {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 0;
+  column-gap: 0;
+  row-gap: 8px;
   padding: 4px var(--gap) 14px;
 }
 
@@ -1054,7 +1068,7 @@ html, body {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  font-size: 14px;
+  font-size: 20px;
   font-weight: 400;
   cursor: pointer;
   position: relative;
@@ -1064,8 +1078,8 @@ html, body {
 .cal-day-num {
   position: relative;
   z-index: 1;
-  width: 32px;
-  height: 32px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1073,6 +1087,7 @@ html, body {
   flex-shrink: 0;
 }
 .cal-cell.empty { pointer-events: none; }
+.cal-cell.out-of-month { pointer-events: none; opacity: .5; }
 .cal-cell:not(.empty):not(.in-trip):hover .cal-day-num { background: rgba(255,255,255,0.06); border-radius: 50%; }
 .cal-cell.other-month { color: var(--text-hint); opacity: .4; }
 .cal-cell.today .cal-day-num { color: var(--accent); font-weight: 600; }
@@ -1080,44 +1095,49 @@ html, body {
   background: var(--accent);
   color: #fff !important;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 /* ── Подсветка периода поездки ── */
 .cal-cell.in-trip::before {
   content: '';
   position: absolute;
-  top: calc(50% - 16px);
-  bottom: calc(50% - 16px);
+  top: 4px;
+  bottom: 4px;
   left: 0;
   right: 0;
   background: rgba(70,77,245,0.35);
   z-index: 0;
 }
-.cal-cell.trip-start::before { left: 50%; border-radius: 4px 0 0 4px; }
-.cal-cell.trip-end::before   { right: 50%; border-radius: 0 4px 4px 0; }
-.cal-cell.trip-start.trip-end::before { left: 0; right: 0; border-radius: 4px; }
+.cal-cell.trip-start::before { left: 50%; border-radius: 8px 0 0 8px; }
+.cal-cell.trip-end::before   { right: 50%; border-radius: 0 8px 8px 0; }
+.cal-cell.trip-start.trip-end::before { left: 0; right: 0; border-radius: 8px; }
+.cal-cell.in-trip.row-start:not(.trip-start)::before { border-radius: 8px 0 0 8px; }
+.cal-cell.in-trip.row-end:not(.trip-end)::before     { border-radius: 0 8px 8px 0; }
 
 .cal-cell.trip-start .cal-day-num,
 .cal-cell.trip-end .cal-day-num {
   background: var(--accent);
   color: #fff;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 .cal-cell.in-trip:not(.trip-start):not(.trip-end) .cal-day-num {
   color: #fff;
 }
-
 .cal-cell.has-events::after {
   content: '';
   position: absolute;
-  bottom: 2px;
+  top: calc(50% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
   width: 4px; height: 4px;
   border-radius: 50%;
   background: var(--accent);
+  z-index: 2;
 }
 .cal-cell.selected::after { background: rgba(255,255,255,0.5); }
+.cal-cell.in-trip::after { background: #fff; }
 
 .events-list {
   padding: 0 var(--gap);
