@@ -1717,22 +1717,30 @@ async function handleFileSelected(file, body) {
   const fd = new FormData();
   fd.append('file', file);
 
-  let doc;
+  let uploadResult;
   try {
-    doc = await API.postForm('/api/documents', fd);
+    uploadResult = await API.postForm('/api/documents', fd);
   } catch (e) {
     showToast('Ошибка загрузки: ' + e.message);
     renderUploadStep1(body);
     return;
   }
 
-  if (!doc) {
+  if (!uploadResult) {
     showToast('Ошибка: не удалось загрузить документ');
     renderUploadStep1(body);
     return;
   }
 
-  renderUploadStep2(body, doc);
+  if (Array.isArray(uploadResult)) {
+    Modal.close();
+    showToast(`Создано ${uploadResult.length} карточки рейсов`);
+    await loadAllData();
+    await applyDocFilters();
+    return;
+  }
+
+  renderUploadStep2(body, uploadResult);
 }
 
 function renderUploadStep2(body, doc) {
