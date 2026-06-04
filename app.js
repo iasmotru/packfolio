@@ -147,6 +147,207 @@ function formatDateShort(str) {
   return formatDate(str);
 }
 
+// ── Флаги стран по городам и странам ──
+
+const LOCATION_FLAGS = {
+  // Страны (RU + EN)
+  'россия':'RU','russia':'RU','российская федерация':'RU',
+  'испания':'ES','spain':'ES',
+  'португалия':'PT','portugal':'PT',
+  'франция':'FR','france':'FR',
+  'германия':'DE','germany':'DE',
+  'италия':'IT','italy':'IT',
+  'великобритания':'GB','uk':'GB','england':'GB','britain':'GB',
+  'нидерланды':'NL','netherlands':'NL','голландия':'NL','holland':'NL',
+  'австрия':'AT','austria':'AT',
+  'швейцария':'CH','switzerland':'CH',
+  'чехия':'CZ','czech republic':'CZ','czechia':'CZ',
+  'венгрия':'HU','hungary':'HU',
+  'польша':'PL','poland':'PL',
+  'швеция':'SE','sweden':'SE',
+  'дания':'DK','denmark':'DK',
+  'норвегия':'NO','norway':'NO',
+  'финляндия':'FI','finland':'FI',
+  'греция':'GR','greece':'GR',
+  'сербия':'RS','serbia':'RS',
+  'хорватия':'HR','croatia':'HR',
+  'словения':'SI','slovenia':'SI',
+  'черногория':'ME','montenegro':'ME',
+  'босния':'BA','bosnia':'BA',
+  'македония':'MK','north macedonia':'MK',
+  'албания':'AL','albania':'AL',
+  'болгария':'BG','bulgaria':'BG',
+  'румыния':'RO','romania':'RO',
+  'турция':'TR','turkey':'TR','türkiye':'TR',
+  'кипр':'CY','cyprus':'CY',
+  'мальта':'MT','malta':'MT',
+  'исландия':'IS','iceland':'IS',
+  'ирландия':'IE','ireland':'IE',
+  'бельгия':'BE','belgium':'BE',
+  'люксембург':'LU','luxembourg':'LU',
+  'оаэ':'AE','uae':'AE','united arab emirates':'AE',
+  'израиль':'IL','israel':'IL',
+  'иордания':'JO','jordan':'JO',
+  'катар':'QA','qatar':'QA',
+  'саудовская аравия':'SA','saudi arabia':'SA',
+  'ливан':'LB','lebanon':'LB',
+  'египет':'EG','egypt':'EG',
+  'марокко':'MA','morocco':'MA',
+  'таиланд':'TH','thailand':'TH',
+  'сингапур':'SG','singapore':'SG',
+  'малайзия':'MY','malaysia':'MY',
+  'индонезия':'ID','indonesia':'ID',
+  'филиппины':'PH','philippines':'PH',
+  'япония':'JP','japan':'JP',
+  'китай':'CN','china':'CN',
+  'корея':'KR','korea':'KR','south korea':'KR',
+  'тайвань':'TW','taiwan':'TW',
+  'гонконг':'HK','hong kong':'HK',
+  'индия':'IN','india':'IN',
+  'австралия':'AU','australia':'AU',
+  'канада':'CA','canada':'CA',
+  'сша':'US','usa':'US','америка':'US','united states':'US',
+  'мексика':'MX','mexico':'MX',
+  'бразилия':'BR','brazil':'BR',
+  'аргентина':'AR','argentina':'AR',
+  'армения':'AM','armenia':'AM',
+  'грузия':'GE','georgia':'GE',
+  'казахстан':'KZ','kazakhstan':'KZ',
+  'узбекистан':'UZ','uzbekistan':'UZ',
+  'украина':'UA','ukraine':'UA',
+  'беларусь':'BY','belarus':'BY',
+  'азербайджан':'AZ','azerbaijan':'AZ',
+  // Города (RU + EN)
+  'москва':'RU','moscow':'RU',
+  'санкт-петербург':'RU','петербург':'RU','спб':'RU','saint petersburg':'RU','st petersburg':'RU',
+  'новосибирск':'RU','екатеринбург':'RU','казань':'RU','сочи':'RU',
+  'мадрид':'ES','madrid':'ES',
+  'барселона':'ES','barcelona':'ES',
+  'севилья':'ES','seville':'ES','sevilla':'ES',
+  'валенсия':'ES','valencia':'ES',
+  'лиссабон':'PT','lisbon':'PT','lisboa':'PT',
+  'порту':'PT','porto':'PT',
+  'париж':'FR','paris':'FR',
+  'лион':'FR','lyon':'FR',
+  'ницца':'FR','nice':'FR',
+  'берлин':'DE','berlin':'DE',
+  'мюнхен':'DE','munich':'DE','münchen':'DE',
+  'гамбург':'DE','hamburg':'DE',
+  'франкфурт':'DE','frankfurt':'DE',
+  'кёльн':'DE','cologne':'DE','köln':'DE',
+  'рим':'IT','rome':'IT','roma':'IT',
+  'милан':'IT','milan':'IT','milano':'IT',
+  'венеция':'IT','venice':'IT','venezia':'IT',
+  'флоренция':'IT','florence':'IT','firenze':'IT',
+  'неаполь':'IT','naples':'IT','napoli':'IT',
+  'лондон':'GB','london':'GB',
+  'манчестер':'GB','manchester':'GB',
+  'эдинбург':'GB','edinburgh':'GB',
+  'амстердам':'NL','amsterdam':'NL',
+  'вена':'AT','vienna':'AT','wien':'AT',
+  'цюрих':'CH','zurich':'CH','zürich':'CH',
+  'женева':'CH','geneva':'CH','genève':'CH',
+  'прага':'CZ','prague':'CZ','praha':'CZ',
+  'будапешт':'HU','budapest':'HU',
+  'варшава':'PL','warsaw':'PL','warszawa':'PL',
+  'краков':'PL','krakow':'PL','kraków':'PL',
+  'стокгольм':'SE','stockholm':'SE',
+  'гётеборг':'SE','gothenburg':'SE',
+  'копенгаген':'DK','copenhagen':'DK',
+  'осло':'NO','oslo':'NO',
+  'хельсинки':'FI','helsinki':'FI',
+  'белград':'RS','belgrade':'RS','beograd':'RS',
+  'загреб':'HR','zagreb':'HR',
+  'дубровник':'HR','dubrovnik':'HR',
+  'сплит':'HR','split':'HR',
+  'любляна':'SI','ljubljana':'SI',
+  'подгорица':'ME','podgorica':'ME',
+  'сараево':'BA','sarajevo':'BA',
+  'тирана':'AL','tirana':'AL',
+  'скопье':'MK','skopje':'MK',
+  'софия':'BG','sofia':'BG',
+  'бухарест':'RO','bucharest':'RO',
+  'стамбул':'TR','istanbul':'TR',
+  'анкара':'TR','ankara':'TR',
+  'анталья':'TR','antalya':'TR',
+  'никосия':'CY','nicosia':'CY',
+  'афины':'GR','athens':'GR','athina':'GR',
+  'салоники':'GR','thessaloniki':'GR',
+  'рейкьявик':'IS','reykjavik':'IS',
+  'дублин':'IE','dublin':'IE',
+  'брюссель':'BE','brussels':'BE','bruxelles':'BE',
+  'дубай':'AE','dubai':'AE',
+  'абу-даби':'AE','abu dhabi':'AE',
+  'тель-авив':'IL','tel aviv':'IL',
+  'иерусалим':'IL','jerusalem':'IL',
+  'амман':'JO','amman':'JO',
+  'доха':'QA','doha':'QA',
+  'бейрут':'LB','beirut':'LB',
+  'каир':'EG','cairo':'EG',
+  'марракеш':'MA','marrakech':'MA',
+  'касабланка':'MA','casablanca':'MA',
+  'бангкок':'TH','bangkok':'TH',
+  'пхукет':'TH','phuket':'TH',
+  'куала-лумпур':'MY','kuala lumpur':'MY',
+  'бали':'ID','bali':'ID',
+  'джакарта':'ID','jakarta':'ID',
+  'манила':'PH','manila':'PH',
+  'токио':'JP','tokyo':'JP',
+  'осака':'JP','osaka':'JP',
+  'киото':'JP','kyoto':'JP',
+  'пекин':'CN','beijing':'CN',
+  'шанхай':'CN','shanghai':'CN',
+  'сеул':'KR','seoul':'KR',
+  'тайбэй':'TW','taipei':'TW',
+  'дели':'IN','delhi':'IN','new delhi':'IN',
+  'мумбаи':'IN','mumbai':'IN',
+  'бангалор':'IN','bangalore':'IN','bengaluru':'IN',
+  'сидней':'AU','sydney':'AU',
+  'мельбурн':'AU','melbourne':'AU',
+  'торонто':'CA','toronto':'CA',
+  'ванкувер':'CA','vancouver':'CA',
+  'монреаль':'CA','montreal':'CA',
+  'нью-йорк':'US','new york':'US',
+  'лос-анджелес':'US','los angeles':'US',
+  'чикаго':'US','chicago':'US',
+  'майами':'US','miami':'US',
+  'сан-франциско':'US','san francisco':'US',
+  'мехико':'MX','mexico city':'MX',
+  'рио-де-жанейро':'BR','rio de janeiro':'BR',
+  'сан-паулу':'BR','são paulo':'BR','sao paulo':'BR',
+  'буэнос-айрес':'AR','buenos aires':'AR',
+  'ереван':'AM','yerevan':'AM',
+  'тбилиси':'GE','tbilisi':'GE',
+  'батуми':'GE','batumi':'GE',
+  'алматы':'KZ','almaty':'KZ',
+  'астана':'KZ','astana':'KZ','нур-султан':'KZ',
+  'ташкент':'UZ','tashkent':'UZ',
+  'самарканд':'UZ','samarkand':'UZ',
+  'киев':'UA','kyiv':'UA','kiev':'UA',
+  'одесса':'UA','odessa':'UA',
+  'минск':'BY','minsk':'BY',
+  'баку':'AZ','baku':'AZ',
+};
+
+function isoToFlag(iso) {
+  return [...iso.toUpperCase()].map(c => String.fromCodePoint(c.charCodeAt(0) + 0x1F1E6 - 65)).join('');
+}
+
+function addLocationFlags(str) {
+  if (!str) return str;
+  const routeParts = str.split(/\s*(?:→|->|–|—)\s*/);
+  return routeParts.map(part => {
+    const subParts = part.split(/\s*,\s*/);
+    let iso = null;
+    for (const sub of subParts) {
+      const key = sub.trim().toLowerCase();
+      if (LOCATION_FLAGS[key]) { iso = LOCATION_FLAGS[key]; break; }
+    }
+    const city = subParts[0].trim();
+    return (iso ? isoToFlag(iso) + ' ' : '') + city;
+  }).join(' → ');
+}
+
 // Иконки и названия типов документов
 const DOC_TYPES = {
   PASSPORT:          { icon: '🛂', label: 'Паспорт',          color: 'type-PASSPORT' },
@@ -195,7 +396,7 @@ const WIDGET_LABELS = {
   nights:            'Ночей',
   room_type:         'Тип номера',
   guests:            'Гостей',
-  flight_number:     'Номер рейса',
+  flight_number:     'Рейс / маршрут',
   pnr:               'PNR / Бронь',
   seat:              'Место',
   departure_place:   'Откуда',
@@ -620,8 +821,8 @@ const OPTIONAL_MINI_FIELDS = new Set(['seat','baggage','tariff','passengers']);
 const WIDGET_FIELDS = {
   HOTEL_BOOKING:      ['hotel_name','address','check_in','check_out','nights','room_type','guests'],
   FLIGHT_TICKET:      ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','baggage','tariff'],
-  TRAIN_TICKET:       ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
-  BUS_TICKET:         ['pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
+  TRAIN_TICKET:       ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
+  BUS_TICKET:         ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
   // departure_time / arrival_time хранятся в data, но не показываются отдельно
   CAR_RENTAL:         ['car_model','plate','pickup_date','pickup_time','dropoff_date','dropoff_time'],
   MEDICAL_INSURANCE:  ['days','coverage_amount','start_date','end_date'],
@@ -754,7 +955,7 @@ function renderHomePage() {
       <div style="display:flex;gap:20px;flex-wrap:wrap">
         ${upcoming.locations ? `<div>
           <div style="font-size:10px;font-weight:500;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.5px">Место</div>
-          <div style="font-size:16px;margin-top:3px">${escHtml(upcoming.locations)}</div>
+          <div style="font-size:16px;margin-top:3px">${escHtml(addLocationFlags(upcoming.locations))}</div>
         </div>` : ''}
         ${upcoming.start_date ? `<div>
           <div style="font-size:10px;font-weight:500;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.5px">Начало</div>
@@ -824,28 +1025,12 @@ function renderTripsPage() {
         <div class="trip-card-title">${escHtml(trip.title)}</div>
       </div>
       <div class="trip-card-meta">
-        <span class="trip-meta-chip">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="4" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2"/>
-            <path d="M3 10H21M8 2V6M16 2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          ${escHtml(datesStr)}
-        </span>
+        <span class="trip-meta-chip">📅 ${escHtml(datesStr)}</span>
         ${trip.locations ? `
         <span class="trip-meta-chip">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2"/>
-            <circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          ${escHtml(trip.locations)}
+          ${escHtml(addLocationFlags(trip.locations))}
         </span>` : ''}
-        ${docCount ? `
-        <span class="trip-meta-chip">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          ${docCount} доку${docCount === 1 ? 'мент' : 'мента'}
-        </span>` : ''}
+        ${docCount ? `<span class="trip-meta-chip">📄 ${docCount} доку${docCount === 1 ? 'мент' : 'мента'}</span>` : ''}
       </div>
       ${trip.note ? `<div class="trip-card-note">${escHtml(trip.note)}</div>` : ''}
     `;
@@ -1057,7 +1242,7 @@ function openTripDetail(trip) {
     const body = el('div', 'modal-body');
     body.innerHTML = `
       <div class="card" style="margin:0">
-        ${trip.locations ? `<div style="margin-bottom:8px">📍 ${escHtml(trip.locations)}</div>` : ''}
+        ${trip.locations ? `<div style="margin-bottom:8px">${escHtml(addLocationFlags(trip.locations))}</div>` : ''}
         <div>📆 ${trip.start_date ? formatDate(trip.start_date) : '—'} → ${trip.end_date ? formatDate(trip.end_date) : '—'}</div>
         ${trip.note ? `<div style="margin-top:10px;color:var(--text-hint);font-size:14px">${escHtml(trip.note)}</div>` : ''}
       </div>
@@ -2168,7 +2353,7 @@ function renderEventsList(container) {
         <div class="event-type-badge" style="background:var(--accent)">🗺</div>
         <div class="event-info">
           <div class="event-title">${escHtml(ev.title)}</div>
-          ${trip?.locations ? `<div class="event-sub">📍 ${escHtml(trip.locations)}</div>` : ''}
+          ${trip?.locations ? `<div class="event-sub">${escHtml(addLocationFlags(trip.locations))}</div>` : ''}
           <div class="event-sub">
             ${ev.date ? formatDateShort(ev.date) : ''}${ev.end_date && ev.end_date !== ev.date ? ` — ${formatDateShort(ev.end_date)}` : ''}
           </div>
