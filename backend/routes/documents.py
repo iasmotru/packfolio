@@ -162,7 +162,7 @@ async def upload_document(
         # Заголовок: если пользователь задал и сегмент один — используем его
         if title and not is_multi:
             doc_title = title
-        elif doc_type == "FLIGHT_TICKET":
+        elif doc_type in ("FLIGHT_TICKET", "BUS_TICKET", "TRAIN_TICKET"):
             doc_title = _leg_title(seg, idx)
         elif doc_type == "HOTEL_BOOKING":
             doc_title = seg.get("hotel_name") or title or (file.filename or "Без названия")

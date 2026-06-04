@@ -26,7 +26,7 @@ def extract_text_from_pdf(file_path: str) -> str:
             text = page.extract_text()
             if text:
                 parts.append(text)
-        return "\n".join(parts)
+        return "\f".join(parts)
     except ImportError:
         return ""
     except Exception as e:
@@ -121,14 +121,20 @@ DOC_PATTERNS: Dict[str, list] = {
         r"\beurolines\b",
         r"\bbus.?station\b",
         r"\bbusterminal\b",
+        r"\bbus\s+no\.?\b",
+        r"\bbus\s+stop\b",
+        r"\bticket\s+no\.?\b",
+        r"\brede.?expressos\b",
+        r"\bomio\b",
+        r"\bdepart(?:ure)?\s*:\s*\d",
     ],
     "HOTEL_BOOKING": [
         r"\bhotel\b",
         r"\bcheck.?in\b",
         r"\bcheck.?out\b",
         r"\broom\b",
-        r"\breservation\b",
-        r"\bbooking(\.com)?\b",
+        r"\bhotel\s+reservation\b",
+        r"\bbooking\.com\b",
         r"\bnight[s]?\b",
         r"\bguest[s]?\b",
         r"\baccommodation\b",
@@ -855,19 +861,59 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
         if arr_time:
             data["arrival_time"] = arr_time
 
+        if doc_type == "BUS_TICKET":
+            # "From Lisboa (Oriente) to Porto (Campanhã)"
+            from_to = re.search(r"\bFrom\s+(.+?)\s+\bto\b\s+(.+?)(?:\n|$)", text, re.IGNORECASE)
+            if from_to:
+                if not data.get("departure_place"):
+                    data["departure_place"] = from_to.group(1).strip()
+                if not data.get("arrival_place"):
+                    data["arrival_place"] = from_to.group(2).strip()
+
+            # "Depart:  02-10-2025  18:30"
+            depart_dt = re.search(
+                r"\bDepart(?:ure)?[:\s]+(\d{1,2}[-./]\d{1,2}[-./]\d{2,4})\s+(\d{2}:\d{2})",
+                text, re.IGNORECASE,
+            )
+            if depart_dt:
+                if not data.get("departure_date"):
+                    data["departure_date"] = normalize_date_str(depart_dt.group(1))
+                if not data.get("departure_time"):
+                    data["departure_time"] = depart_dt.group(2)
+
+            # "Estimated time of arrival:  21:45"
+            arr_t = re.search(r"[Aa]rrivals?[:\s]+(\d{2}:\d{2})", text)
+            if arr_t and not data.get("arrival_time"):
+                data["arrival_time"] = arr_t.group(1)
+            # Дата прибытия = дата отправления если нет явной
+            if data.get("departure_date") and not data.get("arrival_date") and data.get("arrival_time"):
+                data["arrival_date"] = data["departure_date"]
+
+            # "Booking: RK8HNZL"
+            booking_m = re.search(r"\bBooking[:\s]+([A-Z0-9]{5,12})\b", text)
+            if booking_m and not data.get("pnr"):
+                data["pnr"] = booking_m.group(1)
+
+            # "Bus No. 72" → номер маршрута
+            bus_no_m = re.search(r"Bus\s+No\.?\s*(\w+)", text, re.IGNORECASE)
+            if bus_no_m:
+                data["flight_number"] = bus_no_m.group(1)
+
         if doc_type in ("TRAIN_TICKET", "BUS_TICKET"):
-            dep_match = re.search(
-                r"(?:from|departure|abfahrt|откуда|отправление)[:\s]+([^\n]{2,50})",
-                text, re.IGNORECASE,
-            )
-            arr_match = re.search(
-                r"(?:to|arrival|ankunft|куда|прибытие)[:\s]+([^\n]{2,50})",
-                text, re.IGNORECASE,
-            )
-            if dep_match:
-                data["departure_place"] = dep_match.group(1).strip()
-            if arr_match:
-                data["arrival_place"] = arr_match.group(1).strip()
+            if not data.get("departure_place"):
+                dep_match = re.search(
+                    r"(?:from|departure|abfahrt|откуда|отправление)[:\s]+([^\n]{2,50})",
+                    text, re.IGNORECASE,
+                )
+                if dep_match:
+                    data["departure_place"] = dep_match.group(1).strip()
+            if not data.get("arrival_place"):
+                arr_match = re.search(
+                    r"(?:\bto\b|arrival|ankunft|куда|прибытие)[:\s]+([^\n]{2,50})",
+                    text, re.IGNORECASE,
+                )
+                if arr_match:
+                    data["arrival_place"] = arr_match.group(1).strip()
 
     return data
 
@@ -1048,5 +1094,15 @@ def parse_document(file_path: str, mime_type: str) -> Tuple[str, float, List[Dic
         legs = _extract_flight_legs(lines, pnr=pnr)
         if len(legs) >= 2:
             return doc_type, confidence, legs
+
+    if doc_type == "BUS_TICKET":
+        pages = [p for p in text.split("\f") if p.strip()]
+        if len(pages) >= 2:
+            ticket_nos = [re.search(r"Ticket\s+No[:\s]+(\d+)", p, re.IGNORECASE) for p in pages]
+            if all(ticket_nos):
+                unique = {m.group(1) for m in ticket_nos}
+                if len(unique) == len(pages):
+                    segments = [extract_widget_data(p, doc_type) for p in pages]
+                    return doc_type, confidence, segments
 
     return doc_type, confidence, [extracted]
