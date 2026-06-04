@@ -407,7 +407,7 @@ const WIDGET_LABELS = {
   arrival_time:      'Время прибытия',
   baggage:           'Багаж',
   tariff:            'Тариф / класс',
-  passengers:        'Пассажиров',
+  passengers:        'Пассажир',
   car_model:         'Марка авто',
   plate:             'Номер авто',
   pickup_date:       'Дата выдачи',
