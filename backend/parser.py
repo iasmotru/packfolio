@@ -731,18 +731,19 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
 
     # ── Специфика FLIGHT_TICKET ────────────────────────────────────────────
     if doc_type == "FLIGHT_TICKET":
-        # Номер рейса: "PC1099" / "PC 1099" / "JU-571"
-        # Сначала по ключевому слову (точнее)
+        # Номер рейса: "PC1099" / "PC 1099" / "JU-571" / "W6 2437" (буква+цифра)
+        # IATA airline code = 2 символа: [A-Z]{2} или [A-Z]\d
+        _AIRLINE = r'[A-Z]{2}|[A-Z]\d'
         flight_kw = re.search(
-            r'(?:номер\s+рейса|flight\s+number|flight)[:\s]+([A-Z]{2})[\s\-]*(\d{3,4})\b',
+            rf'(?:номер\s+рейса|рейс\s+номер|flight\s+(?:number|no\.?)|рейс)[:\s]+({_AIRLINE})[\s\-]*(\d{{3,4}})\b',
             text, re.IGNORECASE,
         )
         if flight_kw:
             data["flight_number"] = flight_kw.group(1).upper() + flight_kw.group(2)
         else:
-            flight_match = re.search(r"\b([A-Z]{2})[\s\-]*(\d{3,4})\b", text)
+            flight_match = re.search(rf"\b({_AIRLINE})[\s\-]*(\d{{3,4}})\b", text)
             if flight_match:
-                data["flight_number"] = flight_match.group(1) + flight_match.group(2)
+                data["flight_number"] = flight_match.group(1).upper() + flight_match.group(2)
 
         # Класс / тариф
         tariff_match = re.search(r"(?:class|класс|тариф)[:\s]+([^\n\d]{2,30})", text, re.IGNORECASE)
@@ -830,6 +831,77 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
             arr_place = _extract_airport(text, r"to|arrival|arrives?|destination|куда|прилёт в")
             if arr_place:
                 data["arrival_place"] = arr_place
+
+        # ── Wizz Air / посадочный талон ────────────────────────────────────
+        if re.search(r"wizzair|wizz\s+air|посадочный\s+талон|boarding\s+pass", text, re.IGNORECASE):
+            # DEP / DEST BUD - IST → ищем и IATA, и полные названия городов рядом
+            dep_dest = re.search(r"DEP\s*/\s*DEST\s+([A-Z]{3})\s*[-–]\s*([A-Z]{3})", text)
+            dep_iata = dep_dest.group(1) if dep_dest else None
+            arr_iata = dep_dest.group(2) if dep_dest else None
+
+            # Полные названия: "TERMINAL 2B\nBUDAPEST" и следующий большой город
+            terminal_m = re.search(r"TERMINAL\s+\S+\s*\n([A-Z]{4,})\b", text)
+            dep_city = terminal_m.group(1).title() if terminal_m else None
+
+            # Город назначения — строка после первого города (BUDAPEST\nISTANBUL)
+            cities = re.findall(r"\n([A-Z]{4,})(?=\n)", text)
+            arr_city = None
+            if dep_city:
+                for c in cities:
+                    if c.title() != dep_city and c not in ("TERMINAL", "ISTANBUL"[:0]):
+                        if dep_iata and c[:3] == arr_iata or True:
+                            arr_city = c.title()
+                            break
+
+            if dep_city and dep_iata:
+                data["departure_place"] = f"{dep_city} ({dep_iata})"
+            elif dep_city:
+                data["departure_place"] = dep_city
+            elif dep_iata:
+                data["departure_place"] = dep_iata
+
+            if arr_city and arr_iata:
+                data["arrival_place"] = f"{arr_city} ({arr_iata})"
+            elif arr_city:
+                data["arrival_place"] = arr_city
+            elif arr_iata:
+                data["arrival_place"] = arr_iata
+
+            # Вылет: "Вылет\n18:40" или "Departure time\n18:40"
+            vylеt_t = re.search(r"(?:Вылет|Departure\s+time)\s*\n\s*(\d{2}:\d{2})", text, re.IGNORECASE)
+            if vylеt_t:
+                data["departure_time"] = vylеt_t.group(1)
+
+            # Прибытие: "Прибытие:\n21:55"
+            prib_t = re.search(r"Прибытие\s*:?\s*\n\s*(\d{2}:\d{2})", text, re.IGNORECASE)
+            if prib_t:
+                data["arrival_time"] = prib_t.group(1)
+
+            # Дата: "05 / Oct / 2025" или "Дата рейса 05/Oct/2025"
+            date_slash = re.search(r"(\d{1,2})\s*/\s*([A-Za-z]{3})\s*/\s*(\d{4})", text)
+            if date_slash:
+                mon = MONTH_MAP.get(date_slash.group(2).lower()[:3])
+                if mon:
+                    data["departure_date"] = f"{date_slash.group(3)}-{str(mon).zfill(2)}-{date_slash.group(1).zfill(2)}"
+                    data["arrival_date"]   = data["departure_date"]
+
+            # Arrival date = departure date if missing
+            if data.get("departure_date") and not data.get("arrival_date"):
+                data["arrival_date"] = data["departure_date"]
+
+            # Пассажир: "Имя VLADA TURCAN" или "Name\nVLADA TURCAN"
+            pax_m = re.search(r"(?:Имя|Name)\s*\n?\s*([A-Z][A-Z]+\s+[A-Z][A-Z]+)(?:\s|$)", text)
+            if pax_m and not data.get("passengers"):
+                data["passengers"] = pax_m.group(1).strip().title()
+
+            # Багаж: "55x40x23 см\n< 10 кг" или "< 10 кг ... 55x40x23"
+            dims_m = re.search(r"(\d+\s*[xхх×]\s*\d+\s*[xхх×]\s*\d+\s*см)", text, re.IGNORECASE)
+            kg_m   = re.search(r"<\s*(\d+\s*кг)", text, re.IGNORECASE)
+            if dims_m or kg_m:
+                parts = []
+                if kg_m:   parts.append("до " + kg_m.group(1).replace(" ", ""))
+                if dims_m: parts.append(dims_m.group(1).replace(" ", ""))
+                data["baggage"] = ", ".join(parts)
 
         # ── Финальный override для Aviakassa (русский формат) ──────────────
         if re.search(r"aviakassa|данные\s+брони|рейс\s+вылет", text, re.IGNORECASE):
