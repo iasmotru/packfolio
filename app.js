@@ -1159,11 +1159,8 @@ function openTripForm(trip = null) {
         <input class="form-input" id="trip-title" placeholder="Берлин — лето 2025" value="${escHtml(trip?.title || '')}" />
       </div>
       <div class="form-group">
-        <label class="form-label">Место(а)</label>
-        <div class="location-autocomplete" id="location-autocomplete-wrap">
-          <input class="form-input" id="trip-locations" placeholder="Начните вводить город..." autocomplete="off" value="${escHtml(trip?.locations || '')}" />
-          <div class="location-dropdown" id="location-dropdown" style="display:none"></div>
-        </div>
+        <label class="form-label">Города</label>
+        <div id="trip-locations-list"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Дата начала</label>
@@ -1180,15 +1177,63 @@ function openTripForm(trip = null) {
     `;
     sheet.appendChild(body);
 
-    // Date pickers
     applyDateMask(qs('#trip-start', body));
     applyDateMask(qs('#trip-end', body));
 
-    // Location autocomplete
-    initLocationAutocomplete(
-      qs('#trip-locations', body),
-      qs('#location-dropdown', body),
-    );
+    // --- динамический список городов ---
+    const locList = qs('#trip-locations-list', body);
+    const existingCities = trip?.locations
+      ? trip.locations.split(/\s*→\s*/).map(s => s.trim()).filter(Boolean)
+      : [''];
+
+    const addCityRow = (value = '') => {
+      const row = el('div', 'location-row');
+      row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;position:relative';
+
+      const wrap = el('div', 'location-autocomplete');
+      wrap.style.flex = '1';
+      const input = el('input', 'form-input');
+      input.placeholder = 'Начните вводить город...';
+      input.autocomplete = 'off';
+      input.value = value;
+      const dropdown = el('div', 'location-dropdown');
+      dropdown.style.display = 'none';
+      wrap.appendChild(input);
+      wrap.appendChild(dropdown);
+      initLocationAutocomplete(input, dropdown);
+      row.appendChild(wrap);
+
+      const updateButtons = () => {
+        const rows = locList.querySelectorAll('.location-row');
+        rows.forEach((r, i) => {
+          const addBtn = r.querySelector('.loc-add-btn');
+          const delBtn = r.querySelector('.loc-del-btn');
+          if (addBtn) addBtn.style.display = i === rows.length - 1 ? '' : 'none';
+          if (delBtn) delBtn.style.display = rows.length > 1 ? '' : 'none';
+        });
+      };
+
+      const delBtn = el('button', 'btn-ghost loc-del-btn');
+      delBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+      delBtn.style.cssText = 'padding:8px;flex-shrink:0;margin-top:2px';
+      delBtn.onclick = () => { row.remove(); updateButtons(); };
+      row.appendChild(delBtn);
+
+      const addBtn = el('button', 'btn-ghost loc-add-btn');
+      addBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+      addBtn.style.cssText = 'padding:8px;flex-shrink:0;margin-top:2px';
+      addBtn.onclick = () => { addCityRow(); updateButtons(); };
+      row.appendChild(addBtn);
+
+      locList.appendChild(row);
+      updateButtons();
+    };
+
+    existingCities.forEach(c => addCityRow(c));
+
+    const getLocations = () =>
+      [...locList.querySelectorAll('.location-row input')]
+        .map(i => i.value.trim()).filter(Boolean).join(' → ') || null;
 
     const footer = el('div', 'modal-footer');
     if (trip) {
@@ -1210,7 +1255,7 @@ function openTripForm(trip = null) {
       if (!title) { showToast('Введите название'); return; }
       const payload = {
         title,
-        locations: qs('#trip-locations').value.trim() || null,
+        locations:  getLocations(),
         start_date: toIsoDate(qs('#trip-start').value.trim()) || null,
         end_date:   toIsoDate(qs('#trip-end').value.trim()) || null,
         note:       qs('#trip-note').value.trim() || null,
@@ -1345,10 +1390,17 @@ function buildDocMiniCard(doc, showAllFields = false) {
     card.appendChild(typeRow);
   }
 
-  // Tags
-  if (doc.tags?.length) {
+  // Tags + trip badge
+  const trip = doc.trip_id ? State.trips.find(t => t.id === doc.trip_id) : null;
+  if (doc.tags?.length || trip) {
     const tagsDiv = el('div', 'doc-tags');
-    tagsDiv.innerHTML = doc.tags.map(t => `<span class="tag-pill">${escHtml(t.name)}</span>`).join('');
+    if (trip) {
+      const tripPill = el('span', 'tag-pill tag-pill-trip', '✈️ ' + escHtml(trip.title));
+      tagsDiv.appendChild(tripPill);
+    }
+    doc.tags?.forEach(t => {
+      tagsDiv.appendChild(el('span', 'tag-pill', escHtml(t.name)));
+    });
     card.appendChild(tagsDiv);
   }
 
@@ -1918,14 +1970,59 @@ async function handleFileSelected(file, body) {
   }
 
   if (Array.isArray(uploadResult)) {
-    Modal.close();
-    showToast(`Создано ${uploadResult.length} карточки рейсов`);
-    await loadAllData();
-    await applyDocFilters();
+    renderUploadStepMulti(body, uploadResult);
     return;
   }
 
   renderUploadStep2(body, uploadResult);
+}
+
+function renderUploadStepMulti(body, docs) {
+  const sheet = body.closest('.modal-sheet');
+
+  body.innerHTML = `
+    <div style="text-align:center;padding:8px 0 16px">
+      <div style="font-size:36px">✈️</div>
+      <div style="font-size:17px;font-weight:600;margin-top:8px">Создано ${docs.length} карточки</div>
+      <div style="font-size:13px;color:var(--text-hint);margin-top:4px">Прикрепить все к поездке?</div>
+    </div>
+    <div class="doc-card-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px">
+      ${docs.map(d => `<div class="card" style="margin:0;padding:12px 16px;font-size:14px">${escHtml(d.title)}</div>`).join('')}
+    </div>
+    <div class="form-group" style="margin-top:12px">
+      <label class="form-label">Поездка</label>
+      <select class="form-select" id="multi-trip-select">
+        <option value="">— Не указывать —</option>
+        ${State.trips.map(t => `<option value="${t.id}">${escHtml(t.title)}</option>`).join('')}
+      </select>
+    </div>
+  `;
+
+  let footer = sheet.querySelector('.modal-footer');
+  if (!footer) {
+    footer = el('div', 'modal-footer');
+    sheet.appendChild(footer);
+  }
+  footer.innerHTML = '';
+
+  const saveBtn = el('button', 'btn btn-primary', 'Сохранить');
+  saveBtn.style.flex = '1';
+  saveBtn.onclick = async () => {
+    const tripId = qs('#multi-trip-select', body).value;
+    if (tripId) {
+      try {
+        await Promise.all(docs.map(d =>
+          API.put(`/api/documents/${d.id}`, { trip_id: parseInt(tripId) })
+        ));
+      } catch (e) { showToast('Ошибка: ' + e.message); return; }
+    }
+    showToast(`Создано ${docs.length} карточки`);
+    Modal.close();
+    await loadAllData();
+    await applyDocFilters();
+  };
+
+  footer.appendChild(saveBtn);
 }
 
 function renderUploadStep2(body, doc) {
