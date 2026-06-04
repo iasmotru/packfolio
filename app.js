@@ -1043,6 +1043,92 @@ function renderTripsPage() {
 
 // ── Location autocomplete (Nominatim / OpenStreetMap) ──
 
+const _locationCache = new Map();
+
+// Локальный список городов для мгновенного автодополнения (RU + EN)
+const CITY_LIST = [
+  ['Москва','Россия'],['Санкт-Петербург','Россия'],['Новосибирск','Россия'],
+  ['Екатеринбург','Россия'],['Казань','Россия'],['Нижний Новгород','Россия'],
+  ['Сочи','Россия'],['Краснодар','Россия'],['Ростов-на-Дону','Россия'],
+  ['Берлин','Германия'],['Мюнхен','Германия'],['Гамбург','Германия'],['Франкфурт','Германия'],['Кёльн','Германия'],['Дюссельдорф','Германия'],['Штутгарт','Германия'],['Дрезден','Германия'],
+  ['Париж','Франция'],['Лион','Франция'],['Ницца','Франция'],['Марсель','Франция'],['Бордо','Франция'],['Тулуза','Франция'],
+  ['Мадрид','Испания'],['Барселона','Испания'],['Валенсия','Испания'],['Севилья','Испания'],['Малага','Испания'],['Бильбао','Испания'],['Пальма','Испания'],
+  ['Лиссабон','Португалия'],['Порту','Португалия'],['Фару','Португалия'],
+  ['Рим','Италия'],['Милан','Италия'],['Венеция','Италия'],['Флоренция','Италия'],['Неаполь','Италия'],['Болонья','Италия'],['Турин','Италия'],
+  ['Лондон','Великобритания'],['Манчестер','Великобритания'],['Эдинбург','Великобритания'],['Бирмингем','Великобритания'],['Глазго','Великобритания'],['Бристоль','Великобритания'],
+  ['Амстердам','Нидерланды'],['Роттердам','Нидерланды'],['Гаага','Нидерланды'],
+  ['Вена','Австрия'],['Зальцбург','Австрия'],['Инсбрук','Австрия'],
+  ['Прага','Чехия'],['Брно','Чехия'],
+  ['Варшава','Польша'],['Краков','Польша'],['Гданьск','Польша'],['Вроцлав','Польша'],
+  ['Будапешт','Венгрия'],['Дебрецен','Венгрия'],
+  ['Стокгольм','Швеция'],['Гётеборг','Швеция'],['Мальмё','Швеция'],
+  ['Копенгаген','Дания'],['Орхус','Дания'],
+  ['Осло','Норвегия'],['Берген','Норвегия'],
+  ['Хельсинки','Финляндия'],['Тампере','Финляндия'],
+  ['Цюрих','Швейцария'],['Женева','Швейцария'],['Базель','Швейцария'],['Берн','Швейцария'],
+  ['Брюссель','Бельгия'],['Антверпен','Бельгия'],
+  ['Дублин','Ирландия'],
+  ['Рейкьявик','Исландия'],
+  ['Люксембург','Люксембург'],
+  ['Афины','Греция'],['Салоники','Греция'],['Ираклион','Греция'],
+  ['Белград','Сербия'],['Нови-Сад','Сербия'],
+  ['Загреб','Хорватия'],['Сплит','Хорватия'],['Дубровник','Хорватия'],
+  ['Любляна','Словения'],
+  ['Братислава','Словакия'],
+  ['Бухарест','Румыния'],['Клуж','Румыния'],
+  ['София','Болгария'],['Варна','Болгария'],
+  ['Стамбул','Турция'],['Анкара','Турция'],['Анталья','Турция'],['Измир','Турция'],
+  ['Никосия','Кипр'],['Лимасол','Кипр'],
+  ['Тель-Авив','Израиль'],['Иерусалим','Израиль'],['Хайфа','Израиль'],
+  ['Дубай','ОАЭ'],['Абу-Даби','ОАЭ'],
+  ['Амман','Иордания'],['Бейрут','Ливан'],['Доха','Катар'],
+  ['Каир','Египет'],['Шарм-эль-Шейх','Египет'],['Хургада','Египет'],['Александрия','Египет'],
+  ['Марракеш','Марокко'],['Касабланка','Марокко'],['Рабат','Марокко'],
+  ['Тунис','Тунис'],
+  ['Йоханнесбург','ЮАР'],['Кейптаун','ЮАР'],
+  ['Найроби','Кения'],
+  ['Ереван','Армения'],
+  ['Тбилиси','Грузия'],['Батуми','Грузия'],
+  ['Баку','Азербайджан'],
+  ['Алматы','Казахстан'],['Астана','Казахстан'],
+  ['Ташкент','Узбекистан'],['Самарканд','Узбекистан'],
+  ['Минск','Беларусь'],
+  ['Киев','Украина'],['Одесса','Украина'],['Харьков','Украина'],['Львов','Украина'],
+  ['Рига','Латвия'],['Таллин','Эстония'],['Вильнюс','Литва'],
+  ['Скопье','Северная Македония'],['Подгорица','Черногория'],['Тирана','Албания'],
+  ['Сараево','Босния и Герцеговина'],
+  ['Мальта','Мальта'],
+  ['Нью-Йорк','США'],['Лос-Анджелес','США'],['Чикаго','США'],['Майами','США'],['Сан-Франциско','США'],['Лас-Вегас','США'],['Бостон','США'],['Вашингтон','США'],['Сиэтл','США'],
+  ['Торонто','Канада'],['Ванкувер','Канада'],['Монреаль','Канада'],
+  ['Мехико','Мексика'],['Канкун','Мексика'],
+  ['Буэнос-Айрес','Аргентина'],
+  ['Рио-де-Жанейро','Бразилия'],['Сан-Паулу','Бразилия'],
+  ['Токио','Япония'],['Осака','Япония'],['Киото','Япония'],
+  ['Пекин','Китай'],['Шанхай','Китай'],['Гуанчжоу','Китай'],['Гонконг','Китай'],
+  ['Сеул','Южная Корея'],['Пусан','Южная Корея'],
+  ['Бангкок','Таиланд'],['Пхукет','Таиланд'],['Паттайя','Таиланд'],['Чиангмай','Таиланд'],
+  ['Сингапур','Сингапур'],
+  ['Бали','Индонезия'],['Джакарта','Индонезия'],
+  ['Куала-Лумпур','Малайзия'],
+  ['Дели','Индия'],['Мумбаи','Индия'],['Гоа','Индия'],['Бангалор','Индия'],
+  ['Сидней','Австралия'],['Мельбурн','Австралия'],['Брисбен','Австралия'],
+  ['Окленд','Новая Зеландия'],
+];
+
+function mergeResults(local, api) {
+  const seen = new Set(local.map(i => i.value.toLowerCase()));
+  const extra = api.filter(i => !seen.has(i.value.toLowerCase()));
+  return [...local, ...extra].slice(0, 5);
+}
+
+function searchLocalCities(q) {
+  const qLow = q.toLowerCase();
+  return CITY_LIST
+    .filter(([city]) => city.toLowerCase().startsWith(qLow))
+    .slice(0, 5)
+    .map(([city, country]) => ({ label: `${city}, ${country}`, value: `${city}, ${country}` }));
+}
+
 function initLocationAutocomplete(input, dropdown) {
   let abortController = null;
   let selectedFromList = false;
@@ -1055,7 +1141,7 @@ function initLocationAutocomplete(input, dropdown) {
     items.forEach(({ label, value }) => {
       const item = el('div', 'location-item', escHtml(label));
       item.onmousedown = (e) => {
-        e.preventDefault(); // prevent blur before click
+        e.preventDefault();
         selectedFromList = true;
         input.value = value;
         hide();
@@ -1065,62 +1151,66 @@ function initLocationAutocomplete(input, dropdown) {
     dropdown.style.display = 'block';
   };
 
+  const CITY_TYPES = new Set([
+    'city', 'town', 'village', 'hamlet', 'suburb', 'borough',
+    'municipality', 'county', 'state', 'province', 'region',
+    'country', 'island', 'administrative',
+  ]);
+
+  const parseItems = (data) => {
+    const seen = new Set();
+    const items = [];
+    for (const place of data) {
+      if (!CITY_TYPES.has(place.type)) continue;
+      const addr = place.address || {};
+      // Приоритет: русское название из place.name, потом address
+      const city = place.name || addr.city || addr.town || addr.village || addr.county || '';
+      const country = addr.country || '';
+      const value = [city, country].filter(Boolean).join(', ');
+      if (!value || seen.has(value)) continue;
+      seen.add(value);
+      items.push({ label: value, value });
+      if (items.length >= 5) break;
+    }
+    return items;
+  };
+
   input.addEventListener('input', debounce(async () => {
     const q = input.value.trim();
-    if (q.length < 2) { hide(); return; }
+    if (q.length < 1) { hide(); return; }
+
+    // Мгновенный локальный результат
+    const local = searchLocalCities(q);
+    if (local.length) show(local);
+
+    if (q.length < 2) return;
+
+    // Кэш API
+    if (_locationCache.has(q)) {
+      const cached = _locationCache.get(q);
+      const merged = mergeResults(local, cached);
+      show(merged);
+      return;
+    }
 
     if (abortController) abortController.abort();
     abortController = new AbortController();
 
     try {
-      // Запрашиваем больше результатов, чтобы после фильтрации осталось достаточно
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=12&addressdetails=1`;
       const res = await fetch(url, {
         signal: abortController.signal,
         headers: { 'Accept-Language': 'ru,en' },
       });
       const data = await res.json();
-
-      // Только города / районы / страны — исключаем улицы, площади, достопримечательности
-      const CITY_TYPES = new Set([
-        'city', 'town', 'village', 'hamlet', 'suburb', 'borough',
-        'municipality', 'county', 'state', 'province', 'region',
-        'country', 'island', 'administrative',
-      ]);
-
-      // Введённые символы должны стоять в начале хотя бы одного слова в строке
-      const qLower = q.toLowerCase();
-      const matchesWordStart = (str) => {
-        if (!str) return false;
-        return str.toLowerCase().split(/[\s,\-\/().]+/).some(w => w.startsWith(qLower));
-      };
-
-      const seen = new Set();
-      const items = [];
-      for (const place of data) {
-        // Фильтр 1: тип места — только населённые пункты и административные единицы
-        if (!CITY_TYPES.has(place.type)) continue;
-
-        const addr = place.address || {};
-        const city = addr.city || addr.town || addr.village || addr.county || '';
-        const country = addr.country || '';
-        // place.name используем только если из address ничего не получили
-        const displayCity = city || place.name || '';
-        const value = [displayCity, country].filter(Boolean).join(', ');
-        if (!value || seen.has(value)) continue;
-
-        // Фильтр 2: запрос должен быть в начале слова отображаемого названия
-        if (!matchesWordStart(displayCity) && !matchesWordStart(country)) continue;
-
-        seen.add(value);
-        items.push({ label: value, value });
-        if (items.length >= 5) break;
-      }
-      show(items);
+      const apiItems = parseItems(data);
+      _locationCache.set(q, apiItems);
+      if (_locationCache.size > 50) _locationCache.delete(_locationCache.keys().next().value);
+      if (input.value.trim() === q) show(mergeResults(local, apiItems));
     } catch (e) {
-      if (e.name !== 'AbortError') hide();
+      if (e.name !== 'AbortError' && !local.length) hide();
     }
-  }, 350));
+  }, 150));
 
   input.addEventListener('blur', () => {
     // Small delay so onmousedown fires first
@@ -1731,7 +1821,11 @@ function renderDocDetailBody(body, doc) {
   tripSelect.innerHTML = `<option value="">— Без поездки —</option>` +
     State.trips.map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
   tripSelect.onchange = async () => {
-    await API.put(`/api/documents/${doc.id}`, { trip_id: tripSelect.value ? parseInt(tripSelect.value) : null });
+    const newTripId = tripSelect.value ? parseInt(tripSelect.value) : null;
+    await API.put(`/api/documents/${doc.id}`, { trip_id: newTripId });
+    doc.trip_id = newTripId;
+    const idx = State.documents.findIndex(d => d.id === doc.id);
+    if (idx !== -1) State.documents[idx] = { ...State.documents[idx], trip_id: newTripId };
     showToast('Поездка обновлена');
   };
   tripRow.appendChild(tripSelect);
