@@ -923,6 +923,53 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
                 if dims_m: parts.append(dims_m.group(1).strip())
                 data["baggage"] = ", ".join(parts)
 
+        # ── Biletix формат ─────────────────────────────────────────────────
+        if re.search(r"biletix|номер\s+электронного\s+билета|e-ticket\s+number", text, re.IGNORECASE):
+            # Данные пассажира и заказа: "MARTINOVICH MARIIA 670144461 40627104 07П1003520701"
+            bil_pax = re.search(
+                r"([A-Z]{2,}\s+[A-Z]{2,})\s+[A-Z0-9]{6,}\s+(\d{6,12})\s+\S+",
+                text,
+            )
+            if bil_pax:
+                name = bil_pax.group(1).strip().title()
+                data["passengers"] = name
+                if not data.get("pnr"):
+                    data["pnr"] = bil_pax.group(2)
+
+            # Маршрут: "Milan → Budapest"
+            bil_route = re.search(r"^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*→\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)", text, re.MULTILINE)
+            if bil_route:
+                dep_city = bil_route.group(1).strip()
+                arr_city = bil_route.group(2).strip()
+                # Ищем IATA коды рядом с городами (City\nTerminal IATA или "City IATA")
+                dep_iata_m = re.search(rf"{dep_city}[^\n]*\n[^\n]+\s+([A-Z]{{3}})\b", text)
+                arr_iata_m = re.search(rf"{arr_city}[^\n]*\n[^\n]+\s+([A-Z]{{3}})\b", text)
+                dep_iata = dep_iata_m.group(1) if dep_iata_m else ""
+                arr_iata = arr_iata_m.group(1) if arr_iata_m else ""
+                data["departure_place"] = f"{dep_city} ({dep_iata})" if dep_iata else dep_city
+                data["arrival_place"]   = f"{arr_city} ({arr_iata})" if arr_iata else arr_city
+
+            # Даты/времена: "06:55\n05 OCT 2025\n08:35\n05 OCT 2025"
+            bil_dt = re.findall(r"(\d{2}:\d{2})\n(\d{2}\s+[A-Z]{3}\s+\d{4})", text)
+            if len(bil_dt) >= 1:
+                data["departure_time"] = bil_dt[0][0]
+                data["departure_date"] = normalize_date_str(bil_dt[0][1])
+            if len(bil_dt) >= 2:
+                data["arrival_time"] = bil_dt[1][0]
+                data["arrival_date"] = normalize_date_str(bil_dt[1][1])
+
+            # Тариф: "Class: Economy (N)"
+            bil_cls = re.search(r"Class:\s*(Economy|Business|First(?:\s+Class)?)", text, re.IGNORECASE)
+            if bil_cls:
+                data["tariff"] = bil_cls.group(1)
+
+            # Багаж: "Baggage allowance: Нельзя" или "Нельзя"
+            bil_bag = re.search(r"Baggage\s+allowance:\s*([^\n]+)", text, re.IGNORECASE)
+            if bil_bag:
+                val = bil_bag.group(1).strip()
+                if val:
+                    data["baggage"] = val
+
         # ── City.Travel / Рyanair русский формат ───────────────────────────
         if re.search(r"city\.travel|номер\s+авиакомпании\s*/\s*pnr", text, re.IGNORECASE):
             # PNR: "Номер авиакомпании / PNR\nCTMKTJ"
@@ -1307,18 +1354,23 @@ def parse_document(file_path: str, mime_type: str) -> Tuple[str, float, List[Dic
         if len(legs) >= 2:
             return doc_type, confidence, legs
 
-        # Несколько пассажиров в одном PDF (Aviakassa и подобные)
+        # Несколько пассажиров в одном PDF (Aviakassa, Biletix и подобные)
         pages = [p for p in text.split("\f") if p.strip()]
         if len(pages) >= 2:
+            # Aviakassa: "Пассажир\nNAME"
             pax_pat = re.compile(
                 r"(?:Пассажир[^\n]*\n)([A-ZА-ЯЁ][A-ZА-ЯЁ]+\s+[A-ZА-ЯЁ][A-ZА-ЯЁ]+)\s+[A-Z0-9]{5,}",
             )
-            pax_matches = [pax_pat.search(p) for p in pages]
-            ticket_pages = [(pages[i], m.group(1)) for i, m in enumerate(pax_matches) if m]
-            unique_names = {name for _, name in ticket_pages}
-            if len(unique_names) >= 2:
-                segments = [extract_widget_data(p, doc_type) for p, _ in ticket_pages]
-                return doc_type, confidence, segments
+            # Biletix: "LASTNAME FIRSTNAME DOCNO ORDERNO TICKETNO"
+            bil_pat = re.compile(r"([A-Z]{2,}\s+[A-Z]{2,})\s+[A-Z0-9]{6,}\s+\d{6,12}\s+\S+")
+
+            for pat in (pax_pat, bil_pat):
+                pax_matches = [pat.search(p) for p in pages]
+                ticket_pages = [(pages[i], m.group(1)) for i, m in enumerate(pax_matches) if m]
+                unique_names = {name for _, name in ticket_pages}
+                if len(unique_names) >= 2:
+                    segments = [extract_widget_data(p, doc_type) for p, _ in ticket_pages]
+                    return doc_type, confidence, segments
 
     if doc_type == "BUS_TICKET":
         pages = [p for p in text.split("\f") if p.strip()]
