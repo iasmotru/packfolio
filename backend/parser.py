@@ -844,7 +844,7 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
             dep_city = terminal_m.group(1).title() if terminal_m else None
 
             # Город назначения — строка после первого города (BUDAPEST\nISTANBUL)
-            cities = re.findall(r"\n([A-Z]{4,})(?=\n)", text)
+            cities = re.findall(r"\n([A-Z]{4,}(?:[ ][A-Z]{2,})*)(?=\n|$)", text)
             arr_city = None
             if dep_city:
                 for c in cities:
@@ -867,13 +867,13 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
             elif arr_iata:
                 data["arrival_place"] = arr_iata
 
-            # Вылет: "Вылет\n18:40" или "Departure time\n18:40"
-            vylеt_t = re.search(r"(?:Вылет|Departure\s+time)\s*\n\s*(\d{2}:\d{2})", text, re.IGNORECASE)
+            # Вылет: "Вылет\n18:40", "Departure time\n18:40", "Departure\n22:55"
+            vylеt_t = re.search(r"(?:Вылет|Departure(?:\s+time)?)\s*\n\s*(\d{2}:\d{2})", text, re.IGNORECASE)
             if vylеt_t:
                 data["departure_time"] = vylеt_t.group(1)
 
-            # Прибытие: "Прибытие:\n21:55"
-            prib_t = re.search(r"Прибытие\s*:?\s*\n\s*(\d{2}:\d{2})", text, re.IGNORECASE)
+            # Прибытие: "Прибытие:\n21:55", "Arrival:\n01:30"
+            prib_t = re.search(r"(?:Прибытие|Arrival)\s*:?\s*\n\s*(\d{2}:\d{2})", text, re.IGNORECASE)
             if prib_t:
                 data["arrival_time"] = prib_t.group(1)
 
@@ -885,9 +885,20 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
                     data["departure_date"] = f"{date_slash.group(3)}-{str(mon).zfill(2)}-{date_slash.group(1).zfill(2)}"
                     data["arrival_date"]   = data["departure_date"]
 
-            # Arrival date = departure date if missing
-            if data.get("departure_date") and not data.get("arrival_date"):
-                data["arrival_date"] = data["departure_date"]
+            # Arrival date: если не задана — = departure_date, с поправкой на +1 день
+            if data.get("departure_date"):
+                if not data.get("arrival_date"):
+                    data["arrival_date"] = data["departure_date"]
+                # +1 день если прилёт по времени раньше вылета (перелёт через полночь)
+                arr_t = data.get("arrival_time", "")
+                dep_t = data.get("departure_time", "")
+                if arr_t and dep_t and arr_t < dep_t and data["arrival_date"] == data["departure_date"]:
+                    try:
+                        from datetime import date as _date, timedelta
+                        d = _date.fromisoformat(data["departure_date"])
+                        data["arrival_date"] = str(d + timedelta(days=1))
+                    except Exception:
+                        pass
 
             # Пассажир: "Имя VLADA TURCAN" или "Name\nVLADA TURCAN"
             pax_m = re.search(r"(?:Имя|Name)\s*\n?\s*([A-Z][A-Z]+\s+[A-Z][A-Z]+)(?:\s|$)", text)
@@ -902,6 +913,69 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
                 if kg_m:   parts.append("до " + kg_m.group(1).replace(" ", ""))
                 if dims_m: parts.append(dims_m.group(1).replace(" ", ""))
                 data["baggage"] = ", ".join(parts)
+
+        # ── City.Travel / Рyanair русский формат ───────────────────────────
+        if re.search(r"city\.travel|номер\s+авиакомпании\s*/\s*pnr", text, re.IGNORECASE):
+            # PNR: "Номер авиакомпании / PNR\nCTMKTJ"
+            ct_pnr = re.search(r"(?:номер\s+авиакомпании|авиакомпании)\s*/\s*PNR\s*\n\s*([A-Z0-9]{5,8})", text, re.IGNORECASE)
+            if ct_pnr:
+                data["pnr"] = ct_pnr.group(1)
+
+            # Маршрут: "FR-1445 VLC MXP" — IATA коды рядом с номером рейса
+            route_m = re.search(r"(?:[A-Z]{2}|[A-Z]\d)[\s\-]\d{3,4}\s+([A-Z]{3})\s+([A-Z]{3})", text)
+            if route_m:
+                data["departure_place"] = route_m.group(1)
+                data["arrival_place"]   = route_m.group(2)
+
+            # Локальные названия городов: "Валенсия, Испания" и "Милан, Италия"
+            _COUNTRIES = (
+                r"Испания|Италия|Германия|Франция|Португалия|Греция|Турция|"
+                r"Великобритания|Нидерланды|Австрия|Швейцария|Польша|Венгрия|Чехия|"
+                r"Швеция|Дания|Норвегия|Финляндия|Сербия|Хорватия|Болгария|Румыния|"
+                r"Россия|Украина|Беларусь|Грузия|Армения|Казахстан|Азербайджан|"
+                r"США|Канада|Япония|Китай|Австралия|ОАЭ|Израиль|Таиланд|Сингапур|"
+                r"Индия|Египет|Марокко|Кипр|Мальта|Ирландия|Бельгия|Люксембург"
+            )
+            city_pairs = re.findall(
+                rf"([А-Яа-яёЁ][А-Яа-яёЁ\-]+(?:[ \-][А-Яа-яёЁ\-]+)?),[ \t]*(?:{_COUNTRIES})",
+                text,
+            )
+            if len(city_pairs) >= 1 and data.get("departure_place"):
+                data["departure_place"] = f"{city_pairs[0].strip()} ({data['departure_place']})"
+            if len(city_pairs) >= 2 and data.get("arrival_place"):
+                data["arrival_place"] = f"{city_pairs[1].strip()} ({data['arrival_place']})"
+
+            # Даты/времена: "22:10 4 октября 2025" и "00:10 5 октября 2025"
+            ru_dt = re.findall(
+                r"(\d{2}:\d{2})\s+(\d{1,2})\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\s+(\d{4})",
+                text, re.IGNORECASE,
+            )
+            if len(ru_dt) >= 1:
+                t, d, mon_s, y = ru_dt[0]
+                mon = MONTH_MAP.get(mon_s.lower())
+                if mon:
+                    data["departure_time"] = t
+                    data["departure_date"] = f"{y}-{str(mon).zfill(2)}-{d.zfill(2)}"
+            if len(ru_dt) >= 2:
+                t, d, mon_s, y = ru_dt[1]
+                mon = MONTH_MAP.get(mon_s.lower())
+                if mon:
+                    data["arrival_time"] = t
+                    data["arrival_date"] = f"{y}-{str(mon).zfill(2)}-{d.zfill(2)}"
+
+            # Тариф: "Эконом / Economy"
+            ct_tariff = re.search(r"(Эконом|Бизнес|Первый)\s*/\s*(?:Economy|Business|First)", text, re.IGNORECASE)
+            if ct_tariff:
+                data["tariff"] = ct_tariff.group(1)
+
+            # Пассажир: "Vlada Turcan 12.11.2003"
+            ct_pax = re.search(r"([A-Z][a-z]+\s+[A-Z][a-z]+)\s+\d{2}\.\d{2}\.\d{4}", text)
+            if ct_pax:
+                data["passengers"] = ct_pax.group(1).strip()
+
+            # Багаж
+            if re.search(r"Багаж не включен", text, re.IGNORECASE):
+                data["baggage"] = "не включён"
 
         # ── Финальный override для Aviakassa (русский формат) ──────────────
         if re.search(r"aviakassa|данные\s+брони|рейс\s+вылет", text, re.IGNORECASE):
