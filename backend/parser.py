@@ -717,7 +717,7 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
     # ── Багаж ──────────────────────────────────────────────────────────────
     # Сначала ищем конкретный формат: "1 x 20 кг", "1PC", "20KG", "23 kg"
     bag_match = re.search(
-        r"\b(\d+\s*(?:x\s*\d+\s*)?(?:кг|kg|pc|pieces?|bag)(?:\s*\d+\s*(?:кг|kg))?)\b",
+        r"\b(\d+[ \t]*(?:x[ \t]*\d+[ \t]*)?(?:кг|kg|pieces?|bag)(?:[ \t]*\d+[ \t]*(?:кг|kg))?)\b",
         text, re.IGNORECASE,
     )
     if not bag_match:
@@ -844,7 +844,10 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
             dep_city = terminal_m.group(1).title() if terminal_m else None
 
             # Город назначения — строка после первого города (BUDAPEST\nISTANBUL)
-            cities = re.findall(r"\n([A-Z]{4,}(?:[ ][A-Z]{2,})*)(?=\n|$)", text)
+            # Города ищем только в блоке после TERMINAL, чтобы не захватить "EXTRA CABIN BAG" и т.п.
+            terminal_pos = text.upper().find("TERMINAL")
+            _city_src = text[terminal_pos:] if terminal_pos >= 0 else text
+            cities = re.findall(r"\n([A-Z]{4,}(?:[ ][A-Z]{2,})*)(?=\n|$)", _city_src)
             arr_city = None
             if dep_city:
                 for c in cities:
@@ -905,13 +908,19 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
             if pax_m and not data.get("passengers"):
                 data["passengers"] = pax_m.group(1).strip().title()
 
-            # Багаж: "55x40x23 см\n< 10 кг" или "< 10 кг ... 55x40x23"
-            dims_m = re.search(r"(\d+\s*[xхх×]\s*\d+\s*[xхх×]\s*\d+\s*см)", text, re.IGNORECASE)
-            kg_m   = re.search(r"<\s*(\d+\s*кг)", text, re.IGNORECASE)
+            # Багаж: "55 x 40 x 23 cm (Max 10 kg)" или "55x40x23 см < 10 кг"
+            dims_m = re.search(
+                r"(\d+\s*[xхх×]\s*\d+\s*[xхх×]\s*\d+\s*(?:cm|см))",
+                text, re.IGNORECASE,
+            )
+            kg_m = re.search(
+                r"(?:Max|<|до)\s*(\d+\s*(?:kg|кг))",
+                text, re.IGNORECASE,
+            )
             if dims_m or kg_m:
                 parts = []
-                if kg_m:   parts.append("до " + kg_m.group(1).replace(" ", ""))
-                if dims_m: parts.append(dims_m.group(1).replace(" ", ""))
+                if kg_m:   parts.append(kg_m.group(1).strip())
+                if dims_m: parts.append(dims_m.group(1).strip())
                 data["baggage"] = ", ".join(parts)
 
         # ── City.Travel / Рyanair русский формат ───────────────────────────
@@ -973,8 +982,11 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
             if ct_pax:
                 data["passengers"] = ct_pax.group(1).strip()
 
-            # Багаж
-            if re.search(r"Багаж не включен", text, re.IGNORECASE):
+            # Багаж: "Услуга «Багаж 12 кг»" или "Багаж не включен"
+            ct_bag = re.search(r'(?:Услуга\s+[«"\']?)?Багаж\s+(\d+\s*кг)', text, re.IGNORECASE)
+            if ct_bag:
+                data["baggage"] = ct_bag.group(1).strip()
+            elif re.search(r"Багаж не включен", text, re.IGNORECASE):
                 data["baggage"] = "не включён"
 
         # ── Финальный override для Aviakassa (русский формат) ──────────────
