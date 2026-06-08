@@ -680,8 +680,8 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
 
     # ── PNR: сначала ищем по ключевому слову, потом fallback ──────────────
     pnr_kw = re.search(
-        r"(?:pnr|booking\s*ref(?:erence)?|reservation\s*(?:code|number)|"
-        r"confirmation\s*(?:code|number)?|ref(?:erence)?\.?\s*(?:n[o°.]?|number|code)?|"
+        r"(?:\bpnr\b|booking\s*ref(?:erence)?\b|reservation\s*(?:code|number)|"
+        r"confirmation\s*(?:code|number)?|\bref(?:erence)?\b\.?\s*(?:n[o°.]?|number|code)|"
         r"номер\s+брони(?:\s+\S+){0,3}|бронь\b)"
         r"[:\s#\-]+([A-Z0-9]{5,8})\b",
         text, re.IGNORECASE,
@@ -931,10 +931,8 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
                 text,
             )
             if bil_pax:
-                name = bil_pax.group(1).strip().title()
-                data["passengers"] = name
-                if not data.get("pnr"):
-                    data["pnr"] = bil_pax.group(2)
+                data["passengers"] = bil_pax.group(1).strip().title()
+                data["pnr"] = bil_pax.group(2)
 
             # Маршрут: "Milan → Budapest"
             bil_route = re.search(r"^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*→\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)", text, re.MULTILINE)
