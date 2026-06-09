@@ -1426,7 +1426,9 @@ function buildDocMiniCard(doc, showAllFields = false) {
 
   const card = el('div', 'doc-card');
 
-  // Header — click opens full detail
+  // ─── FRONT FACE ───────────────────────────────────────────────────────────
+  const front = el('div', 'doc-card-face');
+
   const header = el('div', 'doc-card-header doc-card-header-clickable');
   header.innerHTML = `
     <div class="doc-type-badge ${info.color}">${info.icon}</div>
@@ -1434,28 +1436,28 @@ function buildDocMiniCard(doc, showAllFields = false) {
       <div class="doc-title">${escHtml(doc.title)}</div>
     </div>
     <div class="doc-card-arrow">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-        <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+        <path d="M12 3c4.97 0 9 4.03 9 9s-4.03 9-9 9-9-4.03-9-9 4.03-9 9-9zM12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
   `;
-  header.onclick = () => openDocDetail(doc);
-  card.appendChild(header);
+  header.onclick = () => doFlip();
+  front.appendChild(header);
 
-  // Editable fields grid — optional fields only if filled (unless showAllFields)
+  // Editable fields grid
   const visibleFields = fields.filter(key =>
     showAllFields || !OPTIONAL_MINI_FIELDS.has(key) || (data[key] !== null && data[key] !== undefined && data[key] !== '')
   );
   if (visibleFields.length) {
-    card.appendChild(el('div', 'doc-card-divider'));
+    front.appendChild(el('div', 'doc-card-divider'));
     const body = el('div', 'doc-card-body');
     visibleFields.forEach(key => body.appendChild(buildCardFieldItem(doc, key)));
-    card.appendChild(body);
+    front.appendChild(body);
   }
 
-  // Для UNKNOWN документов — ручной выбор типа
+  // UNKNOWN type selector
   if (doc.doc_type === 'UNKNOWN') {
-    card.appendChild(el('div', 'doc-card-divider'));
+    front.appendChild(el('div', 'doc-card-divider'));
     const typeRow = el('div', 'doc-card-body');
     const typeLabel = el('div', 'doc-field-label', 'Тип документа');
     const typeSelect = el('select', 'form-select');
@@ -1477,24 +1479,194 @@ function buildDocMiniCard(doc, showAllFields = false) {
     };
     typeRow.appendChild(typeLabel);
     typeRow.appendChild(typeSelect);
-    card.appendChild(typeRow);
+    front.appendChild(typeRow);
   }
 
-  // Tags + trip badge
-  const trip = doc.trip_id ? State.trips.find(t => t.id === doc.trip_id) : null;
-  if (doc.tags?.length || trip) {
-    const tagsDiv = el('div', 'doc-tags');
-    if (trip) {
-      const tripPill = el('span', 'tag-pill tag-pill-trip', '✈️ ' + escHtml(trip.title));
-      tagsDiv.appendChild(tripPill);
+  // Tags + trip pills (rebuilt on refresh)
+  function buildFrontTags() {
+    const existing = front.querySelector('.doc-tags');
+    if (existing) existing.remove();
+    const trip = doc.trip_id ? State.trips.find(t => t.id === doc.trip_id) : null;
+    if (doc.tags?.length || trip) {
+      const tagsDiv = el('div', 'doc-tags');
+      if (trip) tagsDiv.appendChild(el('span', 'tag-pill tag-pill-trip', '✈️ ' + escHtml(trip.title)));
+      doc.tags?.forEach(t => tagsDiv.appendChild(el('span', 'tag-pill', escHtml(t.name))));
+      front.appendChild(tagsDiv);
     }
-    doc.tags?.forEach(t => {
-      tagsDiv.appendChild(el('span', 'tag-pill', escHtml(t.name)));
-    });
-    card.appendChild(tagsDiv);
+  }
+  buildFrontTags();
+
+  card.appendChild(front);
+
+  // ─── BACK FACE ────────────────────────────────────────────────────────────
+  const back = el('div', 'doc-card-face');
+  back.style.display = 'none';
+  buildDocCardBack(back, doc, doFlip, buildFrontTags);
+  card.appendChild(back);
+
+  // ─── Flip logic ───────────────────────────────────────────────────────────
+  let isFlipped = false;
+  function doFlip() {
+    isFlipped = !isFlipped;
+    card.style.transition = 'transform 0.13s ease-in';
+    card.style.transform = 'scaleX(0)';
+    card.addEventListener('transitionend', function handler() {
+      card.removeEventListener('transitionend', handler);
+      if (isFlipped) { front.style.display = 'none'; back.style.display = ''; }
+      else           { back.style.display = 'none';  front.style.display = ''; }
+      card.style.transition = 'transform 0.13s ease-out';
+      card.style.transform = 'scaleX(1)';
+    }, { once: true });
   }
 
   return card;
+}
+
+function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
+  container.innerHTML = '';
+  const info = getDocInfo(doc.doc_type);
+  const conf = doc.widget?.confidence || 0;
+
+  // ─ Header: back button + confidence ─
+  const header = el('div', 'doc-card-header');
+
+  const backBtn = el('button', 'doc-card-back-btn', '');
+  backBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  backBtn.onclick = (e) => { e.stopPropagation(); onFlipBack(); };
+
+  const titleInfo = el('div', 'doc-info');
+  titleInfo.innerHTML = `<div class="doc-title" style="font-size:14px">${escHtml(doc.title)}</div>`;
+
+  const confBadge = el('span', `confidence-badge ${confidenceClass(conf)}`, confidenceLabel(conf));
+
+  header.appendChild(backBtn);
+  header.appendChild(titleInfo);
+  header.appendChild(confBadge);
+  container.appendChild(header);
+
+  container.appendChild(el('div', 'doc-card-divider'));
+
+  // ─ File preview ─
+  const previewWrap = el('div', 'doc-card-preview-wrap');
+  if (doc.file_path) {
+    if (doc.file_mime?.startsWith('image/')) {
+      const img = el('img', 'doc-card-preview-img');
+      img.src = `${CONFIG.API_BASE}/api/documents/${doc.id}/file`;
+      img.alt = doc.title;
+      previewWrap.appendChild(img);
+    } else if (doc.file_mime === 'application/pdf') {
+      const iframe = el('iframe', 'doc-card-preview-iframe');
+      iframe.src = `${CONFIG.API_BASE}/api/documents/${doc.id}/file`;
+      iframe.title = doc.title;
+      previewWrap.appendChild(iframe);
+      // transparent overlay to capture click (iframe swallows events)
+      const overlay = el('div', 'doc-card-preview-overlay');
+      previewWrap.appendChild(overlay);
+    } else {
+      previewWrap.innerHTML = `<div class="doc-preview-placeholder">📎<span>Файл</span></div>`;
+    }
+    previewWrap.onclick = () => window.open(`${CONFIG.API_BASE}/api/documents/${doc.id}/file`, '_blank');
+  } else {
+    previewWrap.innerHTML = `<div class="doc-preview-placeholder">📄<span>Файл не загружен</span></div>`;
+  }
+  container.appendChild(previewWrap);
+
+  container.appendChild(el('div', 'doc-card-divider'));
+
+  // ─ Action buttons ─
+  const actions = el('div', 'doc-card-back-actions');
+
+  const renameBtn = el('button', 'btn btn-secondary', '');
+  renameBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Переименовать`;
+  renameBtn.onclick = async (e) => {
+    e.stopPropagation();
+    const newTitle = prompt('Новое название:', doc.title);
+    if (!newTitle || newTitle.trim() === doc.title) return;
+    try {
+      await API.put(`/api/documents/${doc.id}`, { title: newTitle.trim() });
+      doc.title = newTitle.trim();
+      titleInfo.querySelector('.doc-title').textContent = doc.title;
+      showToast('Переименовано');
+      onFrontRefresh?.();
+    } catch (err) { showToast('Ошибка: ' + err.message); }
+  };
+
+  const replaceBtn = el('button', 'btn btn-secondary', '');
+  replaceBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Заменить`;
+  replaceBtn.onclick = (e) => {
+    e.stopPropagation();
+    openReplaceFileModal(doc.id, async () => { showToast('Файл заменён'); await applyDocFilters(); });
+  };
+
+  const walletBtn = el('button', 'btn btn-secondary', '');
+  walletBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet`;
+  walletBtn.onclick = (e) => { e.stopPropagation(); addToWallet(doc); };
+
+  actions.appendChild(renameBtn);
+  actions.appendChild(replaceBtn);
+  actions.appendChild(walletBtn);
+  container.appendChild(actions);
+
+  container.appendChild(el('div', 'doc-card-divider'));
+
+  // ─ Trip dropdown ─
+  const tripLabel = el('div', 'doc-card-back-section-label', 'Поездка');
+  container.appendChild(tripLabel);
+  const tripSelect = el('select', 'form-select');
+  tripSelect.style.cssText = 'margin: 4px 16px 12px; width: calc(100% - 32px);';
+  tripSelect.innerHTML = `<option value="">— Без поездки —</option>` +
+    State.trips.map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
+  tripSelect.onchange = async (e) => {
+    e.stopPropagation();
+    const newTripId = tripSelect.value ? parseInt(tripSelect.value) : null;
+    try {
+      await API.put(`/api/documents/${doc.id}`, { trip_id: newTripId });
+      doc.trip_id = newTripId;
+      const idx = State.documents.findIndex(d => d.id === doc.id);
+      if (idx !== -1) State.documents[idx] = { ...State.documents[idx], trip_id: newTripId };
+      showToast('Поездка обновлена');
+      onFrontRefresh?.();
+    } catch (err) { showToast('Ошибка: ' + err.message); }
+  };
+  container.appendChild(tripSelect);
+
+  container.appendChild(el('div', 'doc-card-divider'));
+
+  // ─ Tags ─
+  const tagsLabel = el('div', 'doc-card-back-section-label', 'Теги');
+  container.appendChild(tagsLabel);
+  const tagsWrap = el('div');
+  tagsWrap.style.padding = '4px 16px 12px';
+  container.appendChild(tagsWrap);
+  renderTagsEditor(tagsWrap, doc.tags || [], async (newTagIds) => {
+    try {
+      await API.put(`/api/documents/${doc.id}`, { tag_ids: newTagIds });
+      const fresh = await API.get(`/api/documents/${doc.id}`);
+      doc.tags = fresh.tags;
+      showToast('Теги обновлены');
+      onFrontRefresh?.();
+    } catch (err) { showToast('Ошибка: ' + err.message); }
+  });
+
+  container.appendChild(el('div', 'doc-card-divider'));
+
+  // ─ Delete ─
+  const delWrap = el('div');
+  delWrap.style.padding = '12px 16px';
+  const delBtn = el('button', 'btn btn-danger btn-full', '🗑 Удалить документ');
+  delBtn.onclick = async (e) => {
+    e.stopPropagation();
+    if (!confirm('Удалить документ?')) return;
+    try {
+      await API.delete(`/api/documents/${doc.id}`);
+      showToast('Документ удалён');
+      await applyDocFilters();
+    } catch (err) { showToast('Ошибка: ' + err.message); }
+  };
+  delWrap.appendChild(delBtn);
+  container.appendChild(delWrap);
 }
 
 function buildCardFieldItem(doc, key) {
