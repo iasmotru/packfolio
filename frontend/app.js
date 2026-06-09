@@ -96,27 +96,6 @@ const API = {
 // ──────────────────────────────────────────────
 
 function qs(sel, root = document) { return root.querySelector(sel); }
-
-function displayLocations(locations) {
-  if (!locations) return '';
-  const parts = locations.split(' → ');
-  if (parts.length <= 1) return locations;
-  return parts.map(p => {
-    const idx = p.lastIndexOf(', ');
-    return idx === -1 ? p : p.slice(0, idx);
-  }).join(' → ');
-}
-
-function formatLocationsString(values) {
-  return values.join(' → ');
-}
-
-function pluralRu(n, one, few, many) {
-  const mod10 = n % 10, mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${n} ${one}`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${n} ${few}`;
-  return `${n} ${many}`;
-}
 function qsa(sel, root = document) { return [...root.querySelectorAll(sel)]; }
 function el(tag, cls, html) {
   const e = document.createElement(tag);
@@ -168,6 +147,207 @@ function formatDateShort(str) {
   return formatDate(str);
 }
 
+// ── Флаги стран по городам и странам ──
+
+const LOCATION_FLAGS = {
+  // Страны (RU + EN)
+  'россия':'RU','russia':'RU','российская федерация':'RU',
+  'испания':'ES','spain':'ES',
+  'португалия':'PT','portugal':'PT',
+  'франция':'FR','france':'FR',
+  'германия':'DE','germany':'DE',
+  'италия':'IT','italy':'IT',
+  'великобритания':'GB','uk':'GB','england':'GB','britain':'GB',
+  'нидерланды':'NL','netherlands':'NL','голландия':'NL','holland':'NL',
+  'австрия':'AT','austria':'AT',
+  'швейцария':'CH','switzerland':'CH',
+  'чехия':'CZ','czech republic':'CZ','czechia':'CZ',
+  'венгрия':'HU','hungary':'HU',
+  'польша':'PL','poland':'PL',
+  'швеция':'SE','sweden':'SE',
+  'дания':'DK','denmark':'DK',
+  'норвегия':'NO','norway':'NO',
+  'финляндия':'FI','finland':'FI',
+  'греция':'GR','greece':'GR',
+  'сербия':'RS','serbia':'RS',
+  'хорватия':'HR','croatia':'HR',
+  'словения':'SI','slovenia':'SI',
+  'черногория':'ME','montenegro':'ME',
+  'босния':'BA','bosnia':'BA',
+  'македония':'MK','north macedonia':'MK',
+  'албания':'AL','albania':'AL',
+  'болгария':'BG','bulgaria':'BG',
+  'румыния':'RO','romania':'RO',
+  'турция':'TR','turkey':'TR','türkiye':'TR',
+  'кипр':'CY','cyprus':'CY',
+  'мальта':'MT','malta':'MT',
+  'исландия':'IS','iceland':'IS',
+  'ирландия':'IE','ireland':'IE',
+  'бельгия':'BE','belgium':'BE',
+  'люксембург':'LU','luxembourg':'LU',
+  'оаэ':'AE','uae':'AE','united arab emirates':'AE',
+  'израиль':'IL','israel':'IL',
+  'иордания':'JO','jordan':'JO',
+  'катар':'QA','qatar':'QA',
+  'саудовская аравия':'SA','saudi arabia':'SA',
+  'ливан':'LB','lebanon':'LB',
+  'египет':'EG','egypt':'EG',
+  'марокко':'MA','morocco':'MA',
+  'таиланд':'TH','thailand':'TH',
+  'сингапур':'SG','singapore':'SG',
+  'малайзия':'MY','malaysia':'MY',
+  'индонезия':'ID','indonesia':'ID',
+  'филиппины':'PH','philippines':'PH',
+  'япония':'JP','japan':'JP',
+  'китай':'CN','china':'CN',
+  'корея':'KR','korea':'KR','south korea':'KR',
+  'тайвань':'TW','taiwan':'TW',
+  'гонконг':'HK','hong kong':'HK',
+  'индия':'IN','india':'IN',
+  'австралия':'AU','australia':'AU',
+  'канада':'CA','canada':'CA',
+  'сша':'US','usa':'US','америка':'US','united states':'US',
+  'мексика':'MX','mexico':'MX',
+  'бразилия':'BR','brazil':'BR',
+  'аргентина':'AR','argentina':'AR',
+  'армения':'AM','armenia':'AM',
+  'грузия':'GE','georgia':'GE',
+  'казахстан':'KZ','kazakhstan':'KZ',
+  'узбекистан':'UZ','uzbekistan':'UZ',
+  'украина':'UA','ukraine':'UA',
+  'беларусь':'BY','belarus':'BY',
+  'азербайджан':'AZ','azerbaijan':'AZ',
+  // Города (RU + EN)
+  'москва':'RU','moscow':'RU',
+  'санкт-петербург':'RU','петербург':'RU','спб':'RU','saint petersburg':'RU','st petersburg':'RU',
+  'новосибирск':'RU','екатеринбург':'RU','казань':'RU','сочи':'RU',
+  'мадрид':'ES','madrid':'ES',
+  'барселона':'ES','barcelona':'ES',
+  'севилья':'ES','seville':'ES','sevilla':'ES',
+  'валенсия':'ES','valencia':'ES',
+  'лиссабон':'PT','lisbon':'PT','lisboa':'PT',
+  'порту':'PT','porto':'PT',
+  'париж':'FR','paris':'FR',
+  'лион':'FR','lyon':'FR',
+  'ницца':'FR','nice':'FR',
+  'берлин':'DE','berlin':'DE',
+  'мюнхен':'DE','munich':'DE','münchen':'DE',
+  'гамбург':'DE','hamburg':'DE',
+  'франкфурт':'DE','frankfurt':'DE',
+  'кёльн':'DE','cologne':'DE','köln':'DE',
+  'рим':'IT','rome':'IT','roma':'IT',
+  'милан':'IT','milan':'IT','milano':'IT',
+  'венеция':'IT','venice':'IT','venezia':'IT',
+  'флоренция':'IT','florence':'IT','firenze':'IT',
+  'неаполь':'IT','naples':'IT','napoli':'IT',
+  'лондон':'GB','london':'GB',
+  'манчестер':'GB','manchester':'GB',
+  'эдинбург':'GB','edinburgh':'GB',
+  'амстердам':'NL','amsterdam':'NL',
+  'вена':'AT','vienna':'AT','wien':'AT',
+  'цюрих':'CH','zurich':'CH','zürich':'CH',
+  'женева':'CH','geneva':'CH','genève':'CH',
+  'прага':'CZ','prague':'CZ','praha':'CZ',
+  'будапешт':'HU','budapest':'HU',
+  'варшава':'PL','warsaw':'PL','warszawa':'PL',
+  'краков':'PL','krakow':'PL','kraków':'PL',
+  'стокгольм':'SE','stockholm':'SE',
+  'гётеборг':'SE','gothenburg':'SE',
+  'копенгаген':'DK','copenhagen':'DK',
+  'осло':'NO','oslo':'NO',
+  'хельсинки':'FI','helsinki':'FI',
+  'белград':'RS','belgrade':'RS','beograd':'RS',
+  'загреб':'HR','zagreb':'HR',
+  'дубровник':'HR','dubrovnik':'HR',
+  'сплит':'HR','split':'HR',
+  'любляна':'SI','ljubljana':'SI',
+  'подгорица':'ME','podgorica':'ME',
+  'сараево':'BA','sarajevo':'BA',
+  'тирана':'AL','tirana':'AL',
+  'скопье':'MK','skopje':'MK',
+  'софия':'BG','sofia':'BG',
+  'бухарест':'RO','bucharest':'RO',
+  'стамбул':'TR','istanbul':'TR',
+  'анкара':'TR','ankara':'TR',
+  'анталья':'TR','antalya':'TR',
+  'никосия':'CY','nicosia':'CY',
+  'афины':'GR','athens':'GR','athina':'GR',
+  'салоники':'GR','thessaloniki':'GR',
+  'рейкьявик':'IS','reykjavik':'IS',
+  'дублин':'IE','dublin':'IE',
+  'брюссель':'BE','brussels':'BE','bruxelles':'BE',
+  'дубай':'AE','dubai':'AE',
+  'абу-даби':'AE','abu dhabi':'AE',
+  'тель-авив':'IL','tel aviv':'IL',
+  'иерусалим':'IL','jerusalem':'IL',
+  'амман':'JO','amman':'JO',
+  'доха':'QA','doha':'QA',
+  'бейрут':'LB','beirut':'LB',
+  'каир':'EG','cairo':'EG',
+  'марракеш':'MA','marrakech':'MA',
+  'касабланка':'MA','casablanca':'MA',
+  'бангкок':'TH','bangkok':'TH',
+  'пхукет':'TH','phuket':'TH',
+  'куала-лумпур':'MY','kuala lumpur':'MY',
+  'бали':'ID','bali':'ID',
+  'джакарта':'ID','jakarta':'ID',
+  'манила':'PH','manila':'PH',
+  'токио':'JP','tokyo':'JP',
+  'осака':'JP','osaka':'JP',
+  'киото':'JP','kyoto':'JP',
+  'пекин':'CN','beijing':'CN',
+  'шанхай':'CN','shanghai':'CN',
+  'сеул':'KR','seoul':'KR',
+  'тайбэй':'TW','taipei':'TW',
+  'дели':'IN','delhi':'IN','new delhi':'IN',
+  'мумбаи':'IN','mumbai':'IN',
+  'бангалор':'IN','bangalore':'IN','bengaluru':'IN',
+  'сидней':'AU','sydney':'AU',
+  'мельбурн':'AU','melbourne':'AU',
+  'торонто':'CA','toronto':'CA',
+  'ванкувер':'CA','vancouver':'CA',
+  'монреаль':'CA','montreal':'CA',
+  'нью-йорк':'US','new york':'US',
+  'лос-анджелес':'US','los angeles':'US',
+  'чикаго':'US','chicago':'US',
+  'майами':'US','miami':'US',
+  'сан-франциско':'US','san francisco':'US',
+  'мехико':'MX','mexico city':'MX',
+  'рио-де-жанейро':'BR','rio de janeiro':'BR',
+  'сан-паулу':'BR','são paulo':'BR','sao paulo':'BR',
+  'буэнос-айрес':'AR','buenos aires':'AR',
+  'ереван':'AM','yerevan':'AM',
+  'тбилиси':'GE','tbilisi':'GE',
+  'батуми':'GE','batumi':'GE',
+  'алматы':'KZ','almaty':'KZ',
+  'астана':'KZ','astana':'KZ','нур-султан':'KZ',
+  'ташкент':'UZ','tashkent':'UZ',
+  'самарканд':'UZ','samarkand':'UZ',
+  'киев':'UA','kyiv':'UA','kiev':'UA',
+  'одесса':'UA','odessa':'UA',
+  'минск':'BY','minsk':'BY',
+  'баку':'AZ','baku':'AZ',
+};
+
+function isoToFlag(iso) {
+  return [...iso.toUpperCase()].map(c => String.fromCodePoint(c.charCodeAt(0) + 0x1F1E6 - 65)).join('');
+}
+
+function addLocationFlags(str) {
+  if (!str) return str;
+  const routeParts = str.split(/\s*(?:→|->|–|—)\s*/);
+  return routeParts.map(part => {
+    const subParts = part.split(/\s*,\s*/);
+    let iso = null;
+    for (const sub of subParts) {
+      const key = sub.trim().toLowerCase();
+      if (LOCATION_FLAGS[key]) { iso = LOCATION_FLAGS[key]; break; }
+    }
+    const city = subParts[0].trim();
+    return (iso ? isoToFlag(iso) + ' ' : '') + city;
+  }).join(' → ');
+}
+
 // Иконки и названия типов документов
 const DOC_TYPES = {
   PASSPORT:          { icon: '🛂', label: 'Паспорт',          color: 'type-PASSPORT' },
@@ -216,8 +396,7 @@ const WIDGET_LABELS = {
   nights:            'Ночей',
   room_type:         'Тип номера',
   guests:            'Гостей',
-  flight_number:     'Номер рейса',
-  train_number:      'Поезд / маршрут',
+  flight_number:     'Рейс / маршрут',
   pnr:               'PNR / Бронь',
   seat:              'Место',
   departure_place:   'Откуда',
@@ -228,7 +407,7 @@ const WIDGET_LABELS = {
   arrival_time:      'Время прибытия',
   baggage:           'Багаж',
   tariff:            'Тариф / класс',
-  passengers:        'Пассажиров',
+  passengers:        'Пассажир',
   car_model:         'Марка авто',
   plate:             'Номер авто',
   pickup_date:       'Дата выдачи',
@@ -642,8 +821,8 @@ const OPTIONAL_MINI_FIELDS = new Set(['seat','baggage','tariff','passengers']);
 const WIDGET_FIELDS = {
   HOTEL_BOOKING:      ['hotel_name','address','check_in','check_out','nights','room_type','guests'],
   FLIGHT_TICKET:      ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','baggage','tariff'],
-  TRAIN_TICKET:       ['train_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
-  BUS_TICKET:         ['train_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
+  TRAIN_TICKET:       ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
+  BUS_TICKET:         ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
   // departure_time / arrival_time хранятся в data, но не показываются отдельно
   CAR_RENTAL:         ['car_model','plate','pickup_date','pickup_time','dropoff_date','dropoff_time'],
   MEDICAL_INSURANCE:  ['days','coverage_amount','start_date','end_date'],
@@ -776,7 +955,7 @@ function renderHomePage() {
       <div style="display:flex;gap:20px;flex-wrap:wrap">
         ${upcoming.locations ? `<div>
           <div style="font-size:10px;font-weight:500;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.5px">Место</div>
-          <div style="font-size:16px;margin-top:3px">${escHtml(displayLocations(upcoming.locations))}</div>
+          <div style="font-size:16px;margin-top:3px">${escHtml(addLocationFlags(upcoming.locations))}</div>
         </div>` : ''}
         ${upcoming.start_date ? `<div>
           <div style="font-size:10px;font-weight:500;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.5px">Начало</div>
@@ -846,28 +1025,12 @@ function renderTripsPage() {
         <div class="trip-card-title">${escHtml(trip.title)}</div>
       </div>
       <div class="trip-card-meta">
-        <span class="trip-meta-chip">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="4" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2"/>
-            <path d="M3 10H21M8 2V6M16 2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          ${escHtml(datesStr)}
-        </span>
+        <span class="trip-meta-chip">📅 ${escHtml(datesStr)}</span>
         ${trip.locations ? `
         <span class="trip-meta-chip">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" stroke-width="2"/>
-            <circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          ${escHtml(displayLocations(trip.locations))}
+          ${escHtml(addLocationFlags(trip.locations))}
         </span>` : ''}
-        ${docCount ? `
-        <span class="trip-meta-chip">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          ${pluralRu(docCount, 'документ', 'документа', 'документов')}
-        </span>` : ''}
+        ${docCount ? `<span class="trip-meta-chip">📄 ${docCount} доку${docCount === 1 ? 'мент' : 'мента'}</span>` : ''}
       </div>
       ${trip.note ? `<div class="trip-card-note">${escHtml(trip.note)}</div>` : ''}
     `;
@@ -879,6 +1042,92 @@ function renderTripsPage() {
 }
 
 // ── Location autocomplete (Nominatim / OpenStreetMap) ──
+
+const _locationCache = new Map();
+
+// Локальный список городов для мгновенного автодополнения (RU + EN)
+const CITY_LIST = [
+  ['Москва','Россия'],['Санкт-Петербург','Россия'],['Новосибирск','Россия'],
+  ['Екатеринбург','Россия'],['Казань','Россия'],['Нижний Новгород','Россия'],
+  ['Сочи','Россия'],['Краснодар','Россия'],['Ростов-на-Дону','Россия'],
+  ['Берлин','Германия'],['Мюнхен','Германия'],['Гамбург','Германия'],['Франкфурт','Германия'],['Кёльн','Германия'],['Дюссельдорф','Германия'],['Штутгарт','Германия'],['Дрезден','Германия'],
+  ['Париж','Франция'],['Лион','Франция'],['Ницца','Франция'],['Марсель','Франция'],['Бордо','Франция'],['Тулуза','Франция'],
+  ['Мадрид','Испания'],['Барселона','Испания'],['Валенсия','Испания'],['Севилья','Испания'],['Малага','Испания'],['Бильбао','Испания'],['Пальма','Испания'],
+  ['Лиссабон','Португалия'],['Порту','Португалия'],['Фару','Португалия'],
+  ['Рим','Италия'],['Милан','Италия'],['Венеция','Италия'],['Флоренция','Италия'],['Неаполь','Италия'],['Болонья','Италия'],['Турин','Италия'],
+  ['Лондон','Великобритания'],['Манчестер','Великобритания'],['Эдинбург','Великобритания'],['Бирмингем','Великобритания'],['Глазго','Великобритания'],['Бристоль','Великобритания'],
+  ['Амстердам','Нидерланды'],['Роттердам','Нидерланды'],['Гаага','Нидерланды'],
+  ['Вена','Австрия'],['Зальцбург','Австрия'],['Инсбрук','Австрия'],
+  ['Прага','Чехия'],['Брно','Чехия'],
+  ['Варшава','Польша'],['Краков','Польша'],['Гданьск','Польша'],['Вроцлав','Польша'],
+  ['Будапешт','Венгрия'],['Дебрецен','Венгрия'],
+  ['Стокгольм','Швеция'],['Гётеборг','Швеция'],['Мальмё','Швеция'],
+  ['Копенгаген','Дания'],['Орхус','Дания'],
+  ['Осло','Норвегия'],['Берген','Норвегия'],
+  ['Хельсинки','Финляндия'],['Тампере','Финляндия'],
+  ['Цюрих','Швейцария'],['Женева','Швейцария'],['Базель','Швейцария'],['Берн','Швейцария'],
+  ['Брюссель','Бельгия'],['Антверпен','Бельгия'],
+  ['Дублин','Ирландия'],
+  ['Рейкьявик','Исландия'],
+  ['Люксембург','Люксембург'],
+  ['Афины','Греция'],['Салоники','Греция'],['Ираклион','Греция'],
+  ['Белград','Сербия'],['Нови-Сад','Сербия'],
+  ['Загреб','Хорватия'],['Сплит','Хорватия'],['Дубровник','Хорватия'],
+  ['Любляна','Словения'],
+  ['Братислава','Словакия'],
+  ['Бухарест','Румыния'],['Клуж','Румыния'],
+  ['София','Болгария'],['Варна','Болгария'],
+  ['Стамбул','Турция'],['Анкара','Турция'],['Анталья','Турция'],['Измир','Турция'],
+  ['Никосия','Кипр'],['Лимасол','Кипр'],
+  ['Тель-Авив','Израиль'],['Иерусалим','Израиль'],['Хайфа','Израиль'],
+  ['Дубай','ОАЭ'],['Абу-Даби','ОАЭ'],
+  ['Амман','Иордания'],['Бейрут','Ливан'],['Доха','Катар'],
+  ['Каир','Египет'],['Шарм-эль-Шейх','Египет'],['Хургада','Египет'],['Александрия','Египет'],
+  ['Марракеш','Марокко'],['Касабланка','Марокко'],['Рабат','Марокко'],
+  ['Тунис','Тунис'],
+  ['Йоханнесбург','ЮАР'],['Кейптаун','ЮАР'],
+  ['Найроби','Кения'],
+  ['Ереван','Армения'],
+  ['Тбилиси','Грузия'],['Батуми','Грузия'],
+  ['Баку','Азербайджан'],
+  ['Алматы','Казахстан'],['Астана','Казахстан'],
+  ['Ташкент','Узбекистан'],['Самарканд','Узбекистан'],
+  ['Минск','Беларусь'],
+  ['Киев','Украина'],['Одесса','Украина'],['Харьков','Украина'],['Львов','Украина'],
+  ['Рига','Латвия'],['Таллин','Эстония'],['Вильнюс','Литва'],
+  ['Скопье','Северная Македония'],['Подгорица','Черногория'],['Тирана','Албания'],
+  ['Сараево','Босния и Герцеговина'],
+  ['Мальта','Мальта'],
+  ['Нью-Йорк','США'],['Лос-Анджелес','США'],['Чикаго','США'],['Майами','США'],['Сан-Франциско','США'],['Лас-Вегас','США'],['Бостон','США'],['Вашингтон','США'],['Сиэтл','США'],
+  ['Торонто','Канада'],['Ванкувер','Канада'],['Монреаль','Канада'],
+  ['Мехико','Мексика'],['Канкун','Мексика'],
+  ['Буэнос-Айрес','Аргентина'],
+  ['Рио-де-Жанейро','Бразилия'],['Сан-Паулу','Бразилия'],
+  ['Токио','Япония'],['Осака','Япония'],['Киото','Япония'],
+  ['Пекин','Китай'],['Шанхай','Китай'],['Гуанчжоу','Китай'],['Гонконг','Китай'],
+  ['Сеул','Южная Корея'],['Пусан','Южная Корея'],
+  ['Бангкок','Таиланд'],['Пхукет','Таиланд'],['Паттайя','Таиланд'],['Чиангмай','Таиланд'],
+  ['Сингапур','Сингапур'],
+  ['Бали','Индонезия'],['Джакарта','Индонезия'],
+  ['Куала-Лумпур','Малайзия'],
+  ['Дели','Индия'],['Мумбаи','Индия'],['Гоа','Индия'],['Бангалор','Индия'],
+  ['Сидней','Австралия'],['Мельбурн','Австралия'],['Брисбен','Австралия'],
+  ['Окленд','Новая Зеландия'],
+];
+
+function mergeResults(local, api) {
+  const seen = new Set(local.map(i => i.value.toLowerCase()));
+  const extra = api.filter(i => !seen.has(i.value.toLowerCase()));
+  return [...local, ...extra].slice(0, 5);
+}
+
+function searchLocalCities(q) {
+  const qLow = q.toLowerCase();
+  return CITY_LIST
+    .filter(([city]) => city.toLowerCase().startsWith(qLow))
+    .slice(0, 5)
+    .map(([city, country]) => ({ label: `${city}, ${country}`, value: `${city}, ${country}` }));
+}
 
 function initLocationAutocomplete(input, dropdown) {
   let abortController = null;
@@ -892,7 +1141,7 @@ function initLocationAutocomplete(input, dropdown) {
     items.forEach(({ label, value }) => {
       const item = el('div', 'location-item', escHtml(label));
       item.onmousedown = (e) => {
-        e.preventDefault(); // prevent blur before click
+        e.preventDefault();
         selectedFromList = true;
         input.value = value;
         hide();
@@ -902,67 +1151,66 @@ function initLocationAutocomplete(input, dropdown) {
     dropdown.style.display = 'block';
   };
 
+  const CITY_TYPES = new Set([
+    'city', 'town', 'village', 'hamlet', 'suburb', 'borough',
+    'municipality', 'county', 'state', 'province', 'region',
+    'country', 'island', 'administrative',
+  ]);
+
+  const parseItems = (data) => {
+    const seen = new Set();
+    const items = [];
+    for (const place of data) {
+      if (!CITY_TYPES.has(place.type)) continue;
+      const addr = place.address || {};
+      // Приоритет: русское название из place.name, потом address
+      const city = place.name || addr.city || addr.town || addr.village || addr.county || '';
+      const country = addr.country || '';
+      const value = [city, country].filter(Boolean).join(', ');
+      if (!value || seen.has(value)) continue;
+      seen.add(value);
+      items.push({ label: value, value });
+      if (items.length >= 5) break;
+    }
+    return items;
+  };
+
   input.addEventListener('input', debounce(async () => {
     const q = input.value.trim();
-    if (q.length < 2) { hide(); return; }
+    if (q.length < 1) { hide(); return; }
+
+    // Мгновенный локальный результат
+    const local = searchLocalCities(q);
+    if (local.length) show(local);
+
+    if (q.length < 2) return;
+
+    // Кэш API
+    if (_locationCache.has(q)) {
+      const cached = _locationCache.get(q);
+      const merged = mergeResults(local, cached);
+      show(merged);
+      return;
+    }
 
     if (abortController) abortController.abort();
     abortController = new AbortController();
 
-    // Нормализация: дефисы и пробелы взаимозаменяемы
-    const normalize = s => s.toLowerCase().replace(/[-\s]+/g, ' ').trim();
-    const qWords = normalize(q).split(' ').filter(Boolean);
-    const matchesAllWords = (str) => {
-      if (!str) return false;
-      const words = normalize(str).split(' ').filter(Boolean);
-      return qWords.every(qw => words.some(w => w.startsWith(qw)));
-    };
-
     try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=20&addressdetails=1`;
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=12&addressdetails=1`;
       const res = await fetch(url, {
         signal: abortController.signal,
-        headers: { 'Accept-Language': 'ru,en', 'User-Agent': 'Packfolio/1.0' },
+        headers: { 'Accept-Language': 'ru,en' },
       });
-      if (!res.ok) { hide(); return; }
       const data = await res.json();
-
-      const PLACE_TYPES = new Set([
-        'city', 'town', 'village', 'hamlet', 'suburb', 'borough', 'quarter',
-        'neighbourhood', 'municipality', 'county', 'state', 'province',
-        'region', 'country', 'island', 'administrative', 'locality', 'place',
-      ]);
-
-      const seen = new Set();
-      const items = [];
-      for (const place of data) {
-        if (place.class !== 'place' && !PLACE_TYPES.has(place.type)) continue;
-
-        const addr = place.address || {};
-        const city = addr.city || addr.town || addr.village || addr.hamlet
-          || addr.locality || addr.county || place.name || '';
-        const country = addr.country
-          || (place.display_name || '').split(',').pop()?.trim()
-          || '';
-        const displayCity = city;
-
-        // Если скрипты запроса и города совпадают — фильтруем по словам.
-        // Если разные скрипты (кириллица vs латиница) — доверяем Nominatim.
-        const isCyrillic = s => /[а-яёА-ЯЁ]/.test(s);
-        const sameScript = isCyrillic(q) === isCyrillic(displayCity || place.name || '');
-        if (sameScript && !matchesAllWords(displayCity) && !matchesAllWords(place.name || '')) continue;
-        const value = [displayCity, country].filter(Boolean).join(', ');
-        if (!value || seen.has(value)) continue;
-
-        seen.add(value);
-        items.push({ label: value, value });
-        if (items.length >= 5) break;
-      }
-      show(items);
+      const apiItems = parseItems(data);
+      _locationCache.set(q, apiItems);
+      if (_locationCache.size > 50) _locationCache.delete(_locationCache.keys().next().value);
+      if (input.value.trim() === q) show(mergeResults(local, apiItems));
     } catch (e) {
-      if (e.name !== 'AbortError') hide();
+      if (e.name !== 'AbortError' && !local.length) hide();
     }
-  }, 300));
+  }, 150));
 
   input.addEventListener('blur', () => {
     // Small delay so onmousedown fires first
@@ -1000,10 +1248,9 @@ function openTripForm(trip = null) {
         <label class="form-label">Название *</label>
         <input class="form-input" id="trip-title" placeholder="Берлин — лето 2025" value="${escHtml(trip?.title || '')}" />
       </div>
-      <div class="form-group" id="locations-group">
-        <label class="form-label">Место(а)</label>
-        <div id="locations-list"></div>
-        <button type="button" class="btn btn-secondary" id="add-location-btn" style="margin-top:8px;width:100%">+ Добавить город</button>
+      <div class="form-group">
+        <label class="form-label">Города</label>
+        <div id="trip-locations-list"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Дата начала</label>
@@ -1020,21 +1267,17 @@ function openTripForm(trip = null) {
     `;
     sheet.appendChild(body);
 
-    // Date pickers
     applyDateMask(qs('#trip-start', body));
     applyDateMask(qs('#trip-end', body));
 
-    // Multi-location builder
-    const locationsList = qs('#locations-list', body);
-    const existingLocations = trip?.locations
-      ? (trip.locations.includes(' → ')
-          ? trip.locations.split(' → ')
-          : trip.locations.split(','))
-        .map(s => s.trim()).filter(Boolean)
+    // --- динамический список городов ---
+    const locList = qs('#trip-locations-list', body);
+    const existingCities = trip?.locations
+      ? trip.locations.split(/\s*→\s*/).map(s => s.trim()).filter(Boolean)
       : [''];
 
-    function addLocationRow(value = '') {
-      const row = el('div', '');
+    const addCityRow = (value = '') => {
+      const row = el('div', 'location-row');
       row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;position:relative';
 
       const wrap = el('div', 'location-autocomplete');
@@ -1047,27 +1290,40 @@ function openTripForm(trip = null) {
       dropdown.style.display = 'none';
       wrap.appendChild(input);
       wrap.appendChild(dropdown);
+      initLocationAutocomplete(input, dropdown);
+      row.appendChild(wrap);
 
-      const removeBtn = el('button', 'btn btn-icon');
-      removeBtn.type = 'button';
-      removeBtn.textContent = '−';
-      removeBtn.style.cssText = 'flex-shrink:0;font-size:18px;line-height:1;padding:0 10px;height:44px';
-      removeBtn.onclick = () => {
-        if (locationsList.children.length > 1) {
-          row.remove();
-        } else {
-          input.value = '';
-        }
+      const updateButtons = () => {
+        const rows = locList.querySelectorAll('.location-row');
+        rows.forEach((r, i) => {
+          const addBtn = r.querySelector('.loc-add-btn');
+          const delBtn = r.querySelector('.loc-del-btn');
+          if (addBtn) addBtn.style.display = i === rows.length - 1 ? '' : 'none';
+          if (delBtn) delBtn.style.display = rows.length > 1 ? '' : 'none';
+        });
       };
 
-      row.appendChild(wrap);
-      row.appendChild(removeBtn);
-      locationsList.appendChild(row);
-      initLocationAutocomplete(input, dropdown);
-    }
+      const delBtn = el('button', 'btn-ghost loc-del-btn');
+      delBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+      delBtn.style.cssText = 'padding:8px;flex-shrink:0;margin-top:2px';
+      delBtn.onclick = () => { row.remove(); updateButtons(); };
+      row.appendChild(delBtn);
 
-    existingLocations.forEach(v => addLocationRow(v));
-    qs('#add-location-btn', body).onclick = () => addLocationRow('');
+      const addBtn = el('button', 'btn-ghost loc-add-btn');
+      addBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+      addBtn.style.cssText = 'padding:8px;flex-shrink:0;margin-top:2px';
+      addBtn.onclick = () => { addCityRow(); updateButtons(); };
+      row.appendChild(addBtn);
+
+      locList.appendChild(row);
+      updateButtons();
+    };
+
+    existingCities.forEach(c => addCityRow(c));
+
+    const getLocations = () =>
+      [...locList.querySelectorAll('.location-row input')]
+        .map(i => i.value.trim()).filter(Boolean).join(' → ') || null;
 
     const footer = el('div', 'modal-footer');
     if (trip) {
@@ -1089,11 +1345,7 @@ function openTripForm(trip = null) {
       if (!title) { showToast('Введите название'); return; }
       const payload = {
         title,
-        locations: (() => {
-          const vals = Array.from(qs('#locations-list', body).querySelectorAll('input'))
-            .map(i => i.value.trim()).filter(Boolean);
-          return vals.length ? formatLocationsString(vals) : null;
-        })(),
+        locations:  getLocations(),
         start_date: toIsoDate(qs('#trip-start').value.trim()) || null,
         end_date:   toIsoDate(qs('#trip-end').value.trim()) || null,
         note:       qs('#trip-note').value.trim() || null,
@@ -1125,7 +1377,7 @@ function openTripDetail(trip) {
     const body = el('div', 'modal-body');
     body.innerHTML = `
       <div class="card" style="margin:0">
-        ${trip.locations ? `<div style="margin-bottom:8px">📍 ${escHtml(displayLocations(trip.locations))}</div>` : ''}
+        ${trip.locations ? `<div style="margin-bottom:8px">${escHtml(addLocationFlags(trip.locations))}</div>` : ''}
         <div>📆 ${trip.start_date ? formatDate(trip.start_date) : '—'} → ${trip.end_date ? formatDate(trip.end_date) : '—'}</div>
         ${trip.note ? `<div style="margin-top:10px;color:var(--text-hint);font-size:14px">${escHtml(trip.note)}</div>` : ''}
       </div>
@@ -1228,10 +1480,17 @@ function buildDocMiniCard(doc, showAllFields = false) {
     card.appendChild(typeRow);
   }
 
-  // Tags
-  if (doc.tags?.length) {
+  // Tags + trip badge
+  const trip = doc.trip_id ? State.trips.find(t => t.id === doc.trip_id) : null;
+  if (doc.tags?.length || trip) {
     const tagsDiv = el('div', 'doc-tags');
-    tagsDiv.innerHTML = doc.tags.map(t => `<span class="tag-pill">${escHtml(t.name)}</span>`).join('');
+    if (trip) {
+      const tripPill = el('span', 'tag-pill tag-pill-trip', '✈️ ' + escHtml(trip.title));
+      tagsDiv.appendChild(tripPill);
+    }
+    doc.tags?.forEach(t => {
+      tagsDiv.appendChild(el('span', 'tag-pill', escHtml(t.name)));
+    });
     card.appendChild(tagsDiv);
   }
 
@@ -1562,7 +1821,11 @@ function renderDocDetailBody(body, doc) {
   tripSelect.innerHTML = `<option value="">— Без поездки —</option>` +
     State.trips.map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
   tripSelect.onchange = async () => {
-    await API.put(`/api/documents/${doc.id}`, { trip_id: tripSelect.value ? parseInt(tripSelect.value) : null });
+    const newTripId = tripSelect.value ? parseInt(tripSelect.value) : null;
+    await API.put(`/api/documents/${doc.id}`, { trip_id: newTripId });
+    doc.trip_id = newTripId;
+    const idx = State.documents.findIndex(d => d.id === doc.id);
+    if (idx !== -1) State.documents[idx] = { ...State.documents[idx], trip_id: newTripId };
     showToast('Поездка обновлена');
   };
   tripRow.appendChild(tripSelect);
@@ -1579,27 +1842,9 @@ function renderDocDetailBody(body, doc) {
     showToast('Теги обновлены');
   });
 
-  // Перепарсить / Удаление
+  // Удаление
   const delSection = el('div', 'section-title', '');
   body.appendChild(delSection);
-  const reparseBtn = el('button', 'btn btn-secondary btn-full', '🔄 Перепарсить');
-  reparseBtn.style.margin = '0 var(--gap) 8px';
-  reparseBtn.onclick = async () => {
-    reparseBtn.disabled = true;
-    reparseBtn.textContent = 'Парсинг…';
-    try {
-      const updated = await API.post(`/api/documents/${doc.id}/reparse`);
-      Object.assign(doc, updated);
-      showToast('Данные обновлены');
-      Modal.close();
-      await applyDocFilters();
-    } catch (e) {
-      showToast('Ошибка: ' + e.message);
-      reparseBtn.disabled = false;
-      reparseBtn.textContent = '🔄 Перепарсить';
-    }
-  };
-  body.appendChild(reparseBtn);
   const delBtn = el('button', 'btn btn-danger btn-full', '🗑 Удалить документ');
   delBtn.style.margin = '0 var(--gap)';
   delBtn.onclick = async () => {
@@ -1803,28 +2048,75 @@ async function handleFileSelected(file, body) {
   const fd = new FormData();
   fd.append('file', file);
 
-  let result;
+  let uploadResult;
   try {
-    result = await API.postForm('/api/documents', fd);
+    uploadResult = await API.postForm('/api/documents', fd);
   } catch (e) {
     showToast('Ошибка загрузки: ' + e.message);
     renderUploadStep1(body);
     return;
   }
 
-  if (!result) {
+  if (!uploadResult) {
     showToast('Ошибка: не удалось загрузить документ');
     renderUploadStep1(body);
     return;
   }
 
-  // Multi-segment: API возвращает массив документов
-  if (Array.isArray(result)) {
-    renderUploadStep2Multi(body, result);
+  if (Array.isArray(uploadResult)) {
+    renderUploadStepMulti(body, uploadResult);
     return;
   }
 
-  renderUploadStep2(body, result);
+  renderUploadStep2(body, uploadResult);
+}
+
+function renderUploadStepMulti(body, docs) {
+  const sheet = body.closest('.modal-sheet');
+
+  body.innerHTML = `
+    <div style="text-align:center;padding:8px 0 16px">
+      <div style="font-size:36px">✈️</div>
+      <div style="font-size:17px;font-weight:600;margin-top:8px">Создано ${docs.length} карточки</div>
+      <div style="font-size:13px;color:var(--text-hint);margin-top:4px">Прикрепить все к поездке?</div>
+    </div>
+    <div class="doc-card-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px">
+      ${docs.map(d => `<div class="card" style="margin:0;padding:12px 16px;font-size:14px">${escHtml(d.title)}</div>`).join('')}
+    </div>
+    <div class="form-group" style="margin-top:12px">
+      <label class="form-label">Поездка</label>
+      <select class="form-select" id="multi-trip-select">
+        <option value="">— Не указывать —</option>
+        ${State.trips.map(t => `<option value="${t.id}">${escHtml(t.title)}</option>`).join('')}
+      </select>
+    </div>
+  `;
+
+  let footer = sheet.querySelector('.modal-footer');
+  if (!footer) {
+    footer = el('div', 'modal-footer');
+    sheet.appendChild(footer);
+  }
+  footer.innerHTML = '';
+
+  const saveBtn = el('button', 'btn btn-primary', 'Сохранить');
+  saveBtn.style.flex = '1';
+  saveBtn.onclick = async () => {
+    const tripId = qs('#multi-trip-select', body).value;
+    if (tripId) {
+      try {
+        await Promise.all(docs.map(d =>
+          API.put(`/api/documents/${d.id}`, { trip_id: parseInt(tripId) })
+        ));
+      } catch (e) { showToast('Ошибка: ' + e.message); return; }
+    }
+    showToast(`Создано ${docs.length} карточки`);
+    Modal.close();
+    await loadAllData();
+    await applyDocFilters();
+  };
+
+  footer.appendChild(saveBtn);
 }
 
 function renderUploadStep2(body, doc) {
@@ -1902,63 +2194,6 @@ function renderUploadStep2(body, doc) {
     try {
       await API.put(`/api/documents/${doc.id}`, updatePayload);
       showToast('Документ сохранён');
-      Modal.close();
-      await loadAllData();
-      await applyDocFilters();
-    } catch (e) { showToast('Ошибка: ' + e.message); }
-  };
-
-  footer.appendChild(saveBtn);
-}
-
-function renderUploadStep2Multi(body, docs) {
-  const info = getDocInfo(docs[0].doc_type);
-
-  body.innerHTML = `
-    <div style="text-align:center;padding:10px 0 16px">
-      <div style="font-size:48px">${info.icon}</div>
-      <div style="font-size:18px;font-weight:600;margin-top:8px">${pluralRu(docs.length, 'документ', 'документа', 'документов')}</div>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Поездка</label>
-      <select class="form-select" id="doc-trip-select">
-        <option value="">— Без поездки —</option>
-        ${State.trips.map(t => `<option value="${t.id}">${escHtml(t.title)}</option>`).join('')}
-      </select>
-    </div>
-
-    <div id="upload-tags-area"></div>
-  `;
-
-  let selectedTagIds = [];
-  const tagsArea = qs('#upload-tags-area', body);
-  const tagLabel = el('div', 'section-title', 'Теги');
-  tagLabel.style.textTransform = 'none';
-  tagsArea.appendChild(tagLabel);
-  const tagsContainer = el('div');
-  tagsArea.appendChild(tagsContainer);
-  renderTagsEditor(tagsContainer, [], async (ids) => { selectedTagIds = ids; });
-
-  const sheet = body.closest('.modal-sheet');
-  let footer = sheet.querySelector('.modal-footer');
-  if (!footer) {
-    footer = el('div', 'modal-footer');
-    sheet.appendChild(footer);
-  }
-  footer.innerHTML = '';
-
-  const saveBtn = el('button', 'btn btn-primary', 'Сохранить');
-  saveBtn.style.flex = '1';
-  saveBtn.onclick = async () => {
-    const tripId = qs('#doc-trip-select', body).value;
-    const payload = {
-      trip_id: tripId ? parseInt(tripId) : null,
-      tag_ids: selectedTagIds,
-    };
-    try {
-      await Promise.all(docs.map(d => API.put(`/api/documents/${d.id}`, { ...payload, title: d.title })));
-      showToast(`${pluralRu(docs.length, 'документ', 'документа', 'документов')} сохранено`);
       Modal.close();
       await loadAllData();
       await applyDocFilters();
@@ -2309,7 +2544,7 @@ function renderEventsList(container) {
         <div class="event-type-badge" style="background:var(--accent)">🗺</div>
         <div class="event-info">
           <div class="event-title">${escHtml(ev.title)}</div>
-          ${trip?.locations ? `<div class="event-sub">📍 ${escHtml(displayLocations(trip.locations))}</div>` : ''}
+          ${trip?.locations ? `<div class="event-sub">${escHtml(addLocationFlags(trip.locations))}</div>` : ''}
           <div class="event-sub">
             ${ev.date ? formatDateShort(ev.date) : ''}${ev.end_date && ev.end_date !== ev.date ? ` — ${formatDateShort(ev.end_date)}` : ''}
           </div>
