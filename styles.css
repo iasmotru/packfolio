@@ -529,6 +529,8 @@ html, body {
   align-items: center;
   gap: 14px;
   padding: 10px 16px 6px;
+  min-height: 60px;
+  box-sizing: border-box;
 }
 
 /* Превью файла — занимает всю свободную высоту */
