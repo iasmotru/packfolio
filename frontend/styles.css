@@ -620,7 +620,7 @@ html, body {
 .doc-card-back-face .form-input {
   padding: 6px 10px;
   font-size: 13px;
-  margin-top: 4px;
+  margin-top: 0 !important;
 }
 
 /* Теги — компактный контейнер */
