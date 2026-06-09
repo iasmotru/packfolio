@@ -527,8 +527,8 @@ html, body {
 .doc-card-back-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
+  gap: 14px;
+  padding: 10px 16px 6px;
 }
 
 /* Превью файла — занимает всю свободную высоту */
