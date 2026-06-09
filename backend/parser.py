@@ -43,6 +43,9 @@ def extract_pdf_pages(file_path: str) -> List[str]:
         for page in reader.pages:
             text = page.extract_text()
             if text and text.strip():
+                # Удаляем символы Unicode PUA (U+E000–U+F8FF), которые pypdf
+                # вставляет вместо лигатур/кернинга, разрывая токены
+                text = re.sub(r'[-]', '', text)
                 pages.append(text)
         return pages
     except Exception:
@@ -920,6 +923,33 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
                 if dims_m: parts.append(dims_m.group(1).strip())
                 data["baggage"] = ", ".join(parts)
 
+        # ── Авиасейлс / Маршрутная квитанция ──────────────────────────────
+        if re.search(r"маршрутная\s+квитанция|авиасейлс", text, re.IGNORECASE):
+            # Пассажир: "ПАССАЖИР / ДОКУМЕНТ\nFAMILY NAME / doc"
+            pax_av = re.search(
+                r"ПАССАЖИР\s*/\s*ДОКУМЕНТ\s*\n([A-Z][A-Z]+\s+[A-Z][A-Z]+)",
+                text,
+            )
+            if pax_av and not data.get("passengers"):
+                data["passengers"] = pax_av.group(1).strip().title()
+
+            # Рейс: строка вида "W46019" (IATA prefix = буква+буква_или_цифра + 3-5 цифр)
+            flight_av = re.search(r"^([A-Z][A-Z0-9]\d{3,5})$", text, re.MULTILINE)
+            if flight_av:
+                data["flight_number"] = flight_av.group(1)
+
+            # Времена в формате HHMM (4 цифры на отдельной строке)
+            # Структура: IATA(CODE)\nHHMM\nDD mon YYYY\nFLIGHT_NO\n...\nHHMM\nDD mon YYYY
+            hhmm_dates = re.findall(
+                r"^(\d{4})\n\d{2}\s+[а-яёА-ЯЁ]+\s+\d{4}$",
+                text, re.MULTILINE,
+            )
+            if len(hhmm_dates) >= 2:
+                dep_t = hhmm_dates[0]
+                arr_t = hhmm_dates[-1]
+                data["departure_time"] = f"{dep_t[:2]}:{dep_t[2:]}"
+                data["arrival_time"]   = f"{arr_t[:2]}:{arr_t[2:]}"
+
         # ── Biletix формат ─────────────────────────────────────────────────
         if re.search(r"biletix|номер\s+электронного\s+билета|e-ticket\s+number", text, re.IGNORECASE):
             bil_pax = re.search(
@@ -1590,7 +1620,11 @@ def parse_document(file_path: str, mime_type: str) -> Tuple[str, float, List[Dic
                 bil_pat = re.compile(
                     r"([A-Z]{2,}\s+[A-Z]{2,})\s+[A-Z0-9]{6,}\s+\d{6,12}\s+\S+",
                 )
-                for pat in (pax_pat, bil_pat):
+                # Авиасейлс / Маршрутная квитанция: "ПАССАЖИР / ДОКУМЕНТ\nNAME /"
+                aviasales_pat = re.compile(
+                    r"ПАССАЖИР\s*/\s*ДОКУМЕНТ\s*\n([A-Z][A-Z]+\s+[A-Z][A-Z]+)\s*/",
+                )
+                for pat in (pax_pat, bil_pat, aviasales_pat):
                     pax_matches = [pat.search(p) for p in pages]
                     ticket_pages = [(pages[i], m.group(1)) for i, m in enumerate(pax_matches) if m]
                     unique_names = {name for _, name in ticket_pages}
