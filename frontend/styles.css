@@ -502,11 +502,12 @@ html, body {
 
 /* ── Оборотная сторона карточки ─────────────────── */
 
-/* Контейнер оборотной стороны — скроллит если не помещается */
+/* Контейнер оборотной стороны */
 .doc-card-back-face {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  overflow: hidden;
 }
 
 /* Back button */
@@ -530,13 +531,14 @@ html, body {
   padding: 10px 14px;
 }
 
-/* Превью файла — компактное */
+/* Превью файла — занимает всю свободную высоту */
 .doc-card-preview-wrap {
   position: relative;
   background: var(--bg-elevated);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  height: 90px;
+  flex: 1;
+  min-height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -545,14 +547,14 @@ html, body {
 }
 .doc-card-preview-img {
   width: 100%;
-  height: 90px;
+  height: 100%;
   object-fit: cover;
   display: block;
   pointer-events: none;
 }
 .doc-card-preview-iframe {
   width: 100%;
-  height: 90px;
+  height: 100%;
   border: none;
   display: block;
   pointer-events: none;
