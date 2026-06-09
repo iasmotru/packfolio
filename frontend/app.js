@@ -1499,7 +1499,7 @@ function buildDocMiniCard(doc, showAllFields = false) {
   card.appendChild(front);
 
   // ─── BACK FACE ────────────────────────────────────────────────────────────
-  const back = el('div', 'doc-card-face');
+  const back = el('div', 'doc-card-face doc-card-back-face');
   back.style.display = 'none';
   buildDocCardBack(back, doc, doFlip, buildFrontTags);
   card.appendChild(back);
@@ -1508,12 +1508,26 @@ function buildDocMiniCard(doc, showAllFields = false) {
   let isFlipped = false;
   function doFlip() {
     isFlipped = !isFlipped;
+    if (isFlipped) {
+      // Lock card height to the front face height before flipping
+      const h = card.offsetHeight;
+      card.style.height = h + 'px';
+      back.style.height = h + 'px';
+    }
     card.style.transition = 'transform 0.13s ease-in';
     card.style.transform = 'scaleX(0)';
     card.addEventListener('transitionend', function handler() {
       card.removeEventListener('transitionend', handler);
-      if (isFlipped) { front.style.display = 'none'; back.style.display = ''; }
-      else           { back.style.display = 'none';  front.style.display = ''; }
+      if (isFlipped) {
+        front.style.display = 'none';
+        back.style.display = '';
+      } else {
+        back.style.display = 'none';
+        front.style.display = '';
+        // Restore dynamic height when returning to front
+        card.style.height = '';
+        back.style.height = '';
+      }
       card.style.transition = 'transform 0.13s ease-out';
       card.style.transform = 'scaleX(1)';
     }, { once: true });
@@ -1524,31 +1538,29 @@ function buildDocMiniCard(doc, showAllFields = false) {
 
 function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   container.innerHTML = '';
-  const info = getDocInfo(doc.doc_type);
   const conf = doc.widget?.confidence || 0;
 
-  // ─ Header: back button + confidence ─
-  const header = el('div', 'doc-card-header');
+  // ─ Компактный заголовок: ← title [confidence] ─
+  const header = el('div', 'doc-card-back-header');
 
   const backBtn = el('button', 'doc-card-back-btn', '');
-  backBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+  backBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none">
     <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
   backBtn.onclick = (e) => { e.stopPropagation(); onFlipBack(); };
 
-  const titleInfo = el('div', 'doc-info');
-  titleInfo.innerHTML = `<div class="doc-title" style="font-size:14px">${escHtml(doc.title)}</div>`;
+  const titleEl = el('div', 'doc-info');
+  titleEl.innerHTML = `<div class="doc-title" style="font-size:13px;font-weight:500">${escHtml(doc.title)}</div>`;
 
   const confBadge = el('span', `confidence-badge ${confidenceClass(conf)}`, confidenceLabel(conf));
+  confBadge.style.cssText = 'font-size:10px;padding:3px 7px;flex-shrink:0';
 
   header.appendChild(backBtn);
-  header.appendChild(titleInfo);
+  header.appendChild(titleEl);
   header.appendChild(confBadge);
   container.appendChild(header);
 
-  container.appendChild(el('div', 'doc-card-divider'));
-
-  // ─ File preview ─
+  // ─ Превью файла (90px) ─
   const previewWrap = el('div', 'doc-card-preview-wrap');
   if (doc.file_path) {
     if (doc.file_mime?.startsWith('image/')) {
@@ -1561,25 +1573,21 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
       iframe.src = `${CONFIG.API_BASE}/api/documents/${doc.id}/file`;
       iframe.title = doc.title;
       previewWrap.appendChild(iframe);
-      // transparent overlay to capture click (iframe swallows events)
-      const overlay = el('div', 'doc-card-preview-overlay');
-      previewWrap.appendChild(overlay);
+      previewWrap.appendChild(el('div', 'doc-card-preview-overlay'));
     } else {
-      previewWrap.innerHTML = `<div class="doc-preview-placeholder">📎<span>Файл</span></div>`;
+      previewWrap.innerHTML = `<div class="doc-preview-placeholder" style="padding:16px;font-size:12px">📎 Файл</div>`;
     }
     previewWrap.onclick = () => window.open(`${CONFIG.API_BASE}/api/documents/${doc.id}/file`, '_blank');
   } else {
-    previewWrap.innerHTML = `<div class="doc-preview-placeholder">📄<span>Файл не загружен</span></div>`;
+    previewWrap.innerHTML = `<div class="doc-preview-placeholder" style="padding:16px;font-size:12px">📄 Файл не загружен</div>`;
   }
   container.appendChild(previewWrap);
 
-  container.appendChild(el('div', 'doc-card-divider'));
-
-  // ─ Action buttons ─
+  // ─ Кнопки действий (компактные) ─
   const actions = el('div', 'doc-card-back-actions');
 
   const renameBtn = el('button', 'btn btn-secondary', '');
-  renameBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Переименовать`;
+  renameBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Изм.`;
   renameBtn.onclick = async (e) => {
     e.stopPropagation();
     const newTitle = prompt('Новое название:', doc.title);
@@ -1587,21 +1595,21 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
     try {
       await API.put(`/api/documents/${doc.id}`, { title: newTitle.trim() });
       doc.title = newTitle.trim();
-      titleInfo.querySelector('.doc-title').textContent = doc.title;
+      titleEl.querySelector('.doc-title').textContent = doc.title;
       showToast('Переименовано');
       onFrontRefresh?.();
     } catch (err) { showToast('Ошибка: ' + err.message); }
   };
 
   const replaceBtn = el('button', 'btn btn-secondary', '');
-  replaceBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Заменить`;
+  replaceBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Заменить`;
   replaceBtn.onclick = (e) => {
     e.stopPropagation();
     openReplaceFileModal(doc.id, async () => { showToast('Файл заменён'); await applyDocFilters(); });
   };
 
   const walletBtn = el('button', 'btn btn-secondary', '');
-  walletBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet`;
+  walletBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet`;
   walletBtn.onclick = (e) => { e.stopPropagation(); addToWallet(doc); };
 
   actions.appendChild(renameBtn);
@@ -1611,11 +1619,10 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
 
   container.appendChild(el('div', 'doc-card-divider'));
 
-  // ─ Trip dropdown ─
-  const tripLabel = el('div', 'doc-card-back-section-label', 'Поездка');
-  container.appendChild(tripLabel);
-  const tripSelect = el('select', 'form-select');
-  tripSelect.style.cssText = 'margin: 4px 16px 12px; width: calc(100% - 32px);';
+  // ─ Поездка — одна строка ─
+  const tripRow = el('div', 'doc-card-back-row');
+  tripRow.appendChild(el('span', 'doc-card-back-row-label', 'Поездка'));
+  const tripSelect = el('select', 'select-card');
   tripSelect.innerHTML = `<option value="">— Без поездки —</option>` +
     State.trips.map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
   tripSelect.onchange = async (e) => {
@@ -1624,22 +1631,23 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
     try {
       await API.put(`/api/documents/${doc.id}`, { trip_id: newTripId });
       doc.trip_id = newTripId;
-      const idx = State.documents.findIndex(d => d.id === doc.id);
-      if (idx !== -1) State.documents[idx] = { ...State.documents[idx], trip_id: newTripId };
       showToast('Поездка обновлена');
       onFrontRefresh?.();
     } catch (err) { showToast('Ошибка: ' + err.message); }
   };
-  container.appendChild(tripSelect);
+  tripRow.appendChild(tripSelect);
+  container.appendChild(tripRow);
 
   container.appendChild(el('div', 'doc-card-divider'));
 
-  // ─ Tags ─
-  const tagsLabel = el('div', 'doc-card-back-section-label', 'Теги');
-  container.appendChild(tagsLabel);
-  const tagsWrap = el('div');
-  tagsWrap.style.padding = '4px 16px 12px';
-  container.appendChild(tagsWrap);
+  // ─ Теги — компактно ─
+  const tagsRow = el('div', 'doc-card-back-row');
+  tagsRow.style.alignItems = 'flex-start';
+  tagsRow.appendChild(el('span', 'doc-card-back-row-label', 'Теги'));
+  const tagsWrap = el('div', 'doc-card-back-tags');
+  tagsWrap.style.cssText = 'flex:1;padding:0';
+  tagsRow.appendChild(tagsWrap);
+  container.appendChild(tagsRow);
   renderTagsEditor(tagsWrap, doc.tags || [], async (newTagIds) => {
     try {
       await API.put(`/api/documents/${doc.id}`, { tag_ids: newTagIds });
@@ -1652,10 +1660,10 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
 
   container.appendChild(el('div', 'doc-card-divider'));
 
-  // ─ Delete ─
-  const delWrap = el('div');
-  delWrap.style.padding = '12px 16px';
-  const delBtn = el('button', 'btn btn-danger btn-full', '🗑 Удалить документ');
+  // ─ Удалить ─
+  const delWrap = el('div', 'doc-card-back-delete');
+  const delBtn = el('button', 'btn btn-danger', '🗑 Удалить');
+  delBtn.style.cssText = 'width:100%;padding:7px 12px;font-size:12px';
   delBtn.onclick = async (e) => {
     e.stopPropagation();
     if (!confirm('Удалить документ?')) return;
