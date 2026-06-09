@@ -1541,7 +1541,8 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   const conf = doc.widget?.confidence || 0;
 
   // ─ Компактный заголовок: ← title [confidence] ─
-  const header = el('div', 'doc-card-back-header');
+  const header = el('div', 'doc-card-back-header doc-card-header-clickable');
+  header.onclick = () => onFlipBack();
 
   const backBtn = el('button', 'doc-card-back-btn', '');
   backBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none">
