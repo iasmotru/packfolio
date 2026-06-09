@@ -2827,6 +2827,7 @@ const App = {
   navigate(tab, fromHash = false) {
     if (!fromHash) location.hash = tab;
     State.currentTab = tab;
+    document.body.dataset.page = tab;
 
     // Обновляем навигацию
     qsa('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
