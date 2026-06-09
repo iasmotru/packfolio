@@ -1551,7 +1551,7 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   backBtn.onclick = (e) => { e.stopPropagation(); onFlipBack(); };
 
   const titleEl = el('div', 'doc-info');
-  titleEl.innerHTML = `<div class="doc-title" style="font-size:13px;font-weight:500">${escHtml(doc.title)}</div>`;
+  titleEl.innerHTML = `<div class="doc-title">${escHtml(doc.title)}</div>`;
 
   const confBadge = el('span', `confidence-badge ${confidenceClass(conf)}`, confidenceLabel(conf));
   confBadge.style.cssText = 'font-size:10px;padding:3px 7px;flex-shrink:0';
