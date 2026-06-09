@@ -114,7 +114,7 @@ def set_document_tags(db: Session, doc: Document, tag_ids: List[int], user_id: i
 # ──────────────────────────────────────────────
 
 def _leg_title(seg: dict, idx: int) -> str:
-    """Generates a route-based auto-title for a flight leg segment."""
+    """Generates a route-based auto-title for a transport leg segment."""
     dep = seg.get('departure_place', '')
     arr = seg.get('arrival_place', '')
     if dep and arr:
@@ -162,7 +162,7 @@ async def upload_document(
         # Заголовок: если пользователь задал и сегмент один — используем его
         if title and not is_multi:
             doc_title = title
-        elif doc_type in ("FLIGHT_TICKET", "BUS_TICKET", "TRAIN_TICKET"):
+        elif doc_type in ("FLIGHT_TICKET", "TRAIN_TICKET", "BUS_TICKET"):
             doc_title = _leg_title(seg, idx)
         elif doc_type == "HOTEL_BOOKING":
             doc_title = seg.get("hotel_name") or title or (file.filename or "Без названия")
@@ -223,8 +223,25 @@ def list_documents(
     if q:
         query = query.filter(Document.title.ilike(f"%{q}%"))
 
-    docs = query.order_by(Document.created_at.desc()).all()
-    return [doc_to_dict(d) for d in docs]
+    docs = query.order_by(Document.created_at.asc()).all()
+    result = [doc_to_dict(d) for d in docs]
+
+    def _doc_sort_key(d: dict) -> tuple:
+        data = (d.get("widget") or {}).get("data") or {}
+        date = ""
+        time = ""
+        for field in ("departure_date", "check_in", "pickup_date", "start_date"):
+            val = data.get(field)
+            if val:
+                date = str(val)
+                break
+        if not date:
+            date = str(d.get("created_at") or "")
+        time = str(data.get("departure_time") or data.get("pickup_time") or "")
+        return (date, time)
+
+    result.sort(key=_doc_sort_key)
+    return result
 
 
 @router.get("/{doc_id}")
@@ -371,6 +388,44 @@ def download_file(
         media_type=media_type,
         headers={"Content-Disposition": f'{disposition}; filename="{os.path.basename(doc.file_path)}"'},
     )
+
+
+@router.post("/{doc_id}/reparse")
+def reparse_document(
+    doc_id:  int,
+    user_id: int     = Depends(get_current_user_id),
+    db:      Session = Depends(get_db),
+):
+    """Перепарсивает документ с текущей версией парсера без замены файла."""
+    doc = db.query(Document).filter(Document.id == doc_id, Document.user_id == user_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Документ не найден")
+    if not doc.file_path or not os.path.exists(doc.file_path):
+        raise HTTPException(status_code=404, detail="Файл не найден на сервере")
+
+    doc_type, confidence, segments = parse_document(doc.file_path, doc.file_mime or "application/pdf")
+    extracted = segments[0] if segments else {}
+    doc.doc_type   = doc_type
+    doc.updated_at = datetime.utcnow()
+
+    wd = doc.widget_data
+    if wd:
+        wd.data           = extracted
+        wd.extracted_data = extracted
+        wd.confidence     = confidence
+        wd.last_parsed_at = datetime.utcnow()
+    else:
+        db.add(WidgetData(
+            document_id=doc.id,
+            data=extracted,
+            extracted_data=extracted,
+            confidence=confidence,
+            last_parsed_at=datetime.utcnow(),
+        ))
+
+    db.commit()
+    db.refresh(doc)
+    return doc_to_dict(doc)
 
 
 @router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
