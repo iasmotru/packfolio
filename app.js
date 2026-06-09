@@ -1776,7 +1776,9 @@ async function renderDocsPage() {
   qs('#fab').classList.remove('hidden');
   qs('#fab').title = 'Загрузить документ';
 
-  // Поиск
+  // Sticky-контейнер: поиск + фильтры
+  const stickyControls = el('div', 'docs-sticky-controls');
+
   const searchBar = el('div', 'search-bar');
   const searchInput = el('input', 'search-input');
   searchInput.placeholder = '🔍  Поиск документов...';
@@ -1786,9 +1788,8 @@ async function renderDocsPage() {
     applyDocFilters();
   }, 300);
   searchBar.appendChild(searchInput);
-  c.appendChild(searchBar);
+  stickyControls.appendChild(searchBar);
 
-  // Фильтры по типу
   const chips = el('div', 'filter-chips');
   FILTER_TYPES.forEach(({ val, label }) => {
     const active = State.docFilters.doc_type === val;
@@ -1799,7 +1800,9 @@ async function renderDocsPage() {
     };
     chips.appendChild(chip);
   });
-  c.appendChild(chips);
+  stickyControls.appendChild(chips);
+
+  c.appendChild(stickyControls);
 
   // Список документов
   const list = el('div', 'card-list', '');
