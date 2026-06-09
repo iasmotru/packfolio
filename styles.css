@@ -614,6 +614,13 @@ html, body {
   min-width: 56px;
 }
 
+/* Инпут тегов внутри карточки — того же размера, что и select-card */
+.doc-card-back-face .form-input {
+  padding: 6px 10px;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
 /* Теги — компактный контейнер */
 .doc-card-back-tags {
   padding: 0 12px 8px;
