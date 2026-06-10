@@ -2872,7 +2872,8 @@ const App = {
         renderCalendarPage();
       }
     } catch (e) {
-      qs('#page-content').innerHTML = `<div style="padding:24px;color:var(--text-hint);text-align:center">${e.message}</div>`;
+      console.error('navigate error:', e);
+      qs('#page-content').innerHTML = `<div style="padding:24px;color:#ff4444;font-size:14px;word-break:break-all">${e.message}<br><br>${e.stack || ''}</div>`;
     }
   },
 
