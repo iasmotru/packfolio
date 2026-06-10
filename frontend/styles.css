@@ -1163,6 +1163,22 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   flex-shrink: 0;
   text-transform: uppercase;
   letter-spacing: .4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-modified-badge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  flex-shrink: 0;
 }
 
 /* Paragraph M: 16px Regular */
