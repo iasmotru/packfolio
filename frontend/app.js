@@ -1704,7 +1704,21 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
     } else {
       previewWrap.innerHTML = `<div class="doc-preview-placeholder" style="padding:16px;font-size:12px">📎 Файл</div>`;
     }
-    previewWrap.onclick = (e) => { e.stopPropagation(); window.open(`${CONFIG.API_BASE}/api/documents/${doc.id}/file`, '_blank'); };
+    previewWrap.onclick = (e) => {
+      e.stopPropagation();
+      Modal.open(sheet => {
+        const msg = el('p', 'dialog-msg', 'Открыть файл документа?');
+        const row = el('div', 'dialog-btns');
+        const cancelBtn = el('button', 'btn btn-secondary', 'Отменить');
+        cancelBtn.onclick = () => Modal.close();
+        const openBtn = el('button', 'btn btn-primary', 'Открыть');
+        openBtn.onclick = () => { Modal.close(); window.open(`${CONFIG.API_BASE}/api/documents/${doc.id}/file`, '_blank'); };
+        row.appendChild(cancelBtn);
+        row.appendChild(openBtn);
+        sheet.appendChild(msg);
+        sheet.appendChild(row);
+      }, { center: true });
+    };
   } else {
     previewWrap.innerHTML = `<div class="doc-preview-placeholder" style="padding:16px;font-size:12px">📄 Файл не загружен</div>`;
   }

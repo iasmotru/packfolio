@@ -1011,6 +1011,29 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   backdrop-filter: blur(6px);
 }
 .modal-overlay.center { align-items: center; }
+.modal-overlay.center .modal-sheet {
+  border-radius: var(--radius-xl);
+  width: calc(100% - 32px);
+  max-width: 320px;
+  border: 1px solid var(--border);
+  padding: 24px 16px 16px;
+  gap: 0;
+}
+.modal-overlay.center .modal-sheet::before { display: none; }
+
+.dialog-msg {
+  margin: 0 0 20px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+}
+.dialog-btns {
+  display: flex;
+  gap: 8px;
+}
+.dialog-btns .btn { flex: 1; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
