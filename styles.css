@@ -651,6 +651,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   flex-shrink: 0;
   transition: border-color .12s, transform .13s;
   transform-origin: center;
+  cursor: pointer;
 }
 .doc-card:first-child { margin-top: 14px; }
 
@@ -807,11 +808,43 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 .doc-card-header-clickable:active { background: rgba(255,255,255,0.04); }
 
-.doc-card-arrow {
-  color: var(--text-hint);
+/* Кнопка «Редактировать» / «Сохранить» в заголовке карточки */
+.doc-card-edit-btn {
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(70, 77, 245, 0.12);
+  border: 1px solid rgba(70, 77, 245, 0.25);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Onest', sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.doc-card-edit-btn.saving {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.doc-card-edit-btn:active { opacity: .8; }
+
+/* Инпут в режиме редактирования карточки */
+.card-edit-input {
+  width: 100%;
+  height: 30px;
+  margin-top: 3px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-family: 'Onest', sans-serif;
+  background: var(--bg-input);
+  border: 1.5px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text);
+  outline: none;
+  box-sizing: border-box;
 }
 
 .doc-type-badge {
@@ -880,13 +913,10 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 
 .doc-field-editable {
-  cursor: pointer;
   border-radius: 8px;
   padding: 4px;
   margin: -4px;
-  transition: background .1s;
 }
-.doc-field-editable:active { background: var(--accent-dim); }
 
 .card-inline-input {
   width: 100%;
