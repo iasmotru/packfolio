@@ -2457,6 +2457,7 @@ function openReplaceFileModal(docId, onDone) {
 // ── Pro Modal ──
 
 function openProModal() {
+  let selectedPlan = 'year';
   Modal.open(sheet => {
     sheet.appendChild(Modal.buildHeader('Доступно с подпиской'));
     const body = el('div', 'modal-body');
@@ -2465,7 +2466,7 @@ function openProModal() {
         <p style="color:var(--text-hint);font-size:14px;margin-bottom:20px">
           Оформите подписку Pro, чтобы открыть новые возможности Packfolio:
         </p>
-        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px">
+        <ul style="list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:12px">
           <li class="pro-feature-item">
             <span class="pro-feature-icon">✈️</span>
             <span>Создание поездок без ограничений</span>
@@ -2479,12 +2480,32 @@ function openProModal() {
             <span>Совместные поездки</span>
           </li>
         </ul>
+        <div class="pro-plans">
+          <label class="pro-plan active" data-plan="month">
+            <input type="radio" name="plan" value="month" style="display:none">
+            <div class="pro-plan-name">Месяц</div>
+            <div class="pro-plan-price">⭐ 250</div>
+          </label>
+          <label class="pro-plan" data-plan="year">
+            <input type="radio" name="plan" value="year" style="display:none" checked>
+            <div class="pro-plan-name">Год <span class="pro-badge">−30%</span></div>
+            <div class="pro-plan-price">⭐ 2100</div>
+          </label>
+        </div>
       </div>
     `;
     sheet.appendChild(body);
+
+    body.querySelectorAll('.pro-plan').forEach(pl => {
+      pl.onclick = () => {
+        body.querySelectorAll('.pro-plan').forEach(p => p.classList.remove('active'));
+        pl.classList.add('active');
+        selectedPlan = pl.dataset.plan;
+      };
+    });
+
     const footer = el('div', 'modal-footer');
-    const proBtn = el('button', 'btn btn-primary btn-full', '');
-    proBtn.innerHTML = `Оформить подписку Pro <span class="pro-badge" style="background:#fff;color:#464DF5">Pro</span>`;
+    const proBtn = el('button', 'btn btn-primary btn-full', 'Оформить подписку');
     proBtn.onclick = () => Modal.close();
     footer.appendChild(proBtn);
     sheet.appendChild(footer);
