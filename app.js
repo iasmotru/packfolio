@@ -42,12 +42,11 @@ const State = {
 const TG = window.Telegram?.WebApp;
 
 function tgInit() {
-  if (TG) {
-    TG.ready();
-    TG.expand();
-    TG.setHeaderColor('bg_color');
-    TG.setBottomBarColor('bg_color');
-  }
+  if (!TG) return;
+  try { TG.ready(); } catch (_) {}
+  try { TG.expand(); } catch (_) {}
+  try { TG.setHeaderColor('bg_color'); } catch (_) {}
+  try { TG.setBottomBarColor('bg_color'); } catch (_) {}
 }
 
 function getInitData() {
@@ -2909,4 +2908,10 @@ function debounce(fn, ms) {
 // Старт
 // ──────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => App.init());
+document.addEventListener('DOMContentLoaded', () => {
+  App.init().catch(e => {
+    console.error('App.init failed:', e);
+    const c = document.querySelector('#page-content');
+    if (c) c.innerHTML = `<div style="padding:24px;color:#ff4444;font-size:13px;word-break:break-all">${e.message}<br><br>${e.stack||''}</div>`;
+  });
+});
