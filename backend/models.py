@@ -4,22 +4,24 @@ SQLAlchemy + SQLite (без отдельного сервера).
 """
 
 import enum
+import os
 from datetime import datetime
 from typing import Optional
 
+from dotenv import load_dotenv
 from sqlalchemy import (
     Boolean, Column, DateTime, Float, ForeignKey,
     Integer, JSON, String, Text, create_engine, UniqueConstraint
 )
 from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
 
-DATABASE_URL = "sqlite:///./packfolio.db"
+load_dotenv()
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    echo=False,
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./packfolio.db")
+
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
