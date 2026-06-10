@@ -1567,7 +1567,7 @@ function buildDocMiniCard(doc, showAllFields = false) {
     editBtn.classList.remove('saving');
     const newData = doc.widget?.data || {};
     fieldRefs.forEach(({ key, item, valueEl }) => {
-      item.onclick = e => e.stopPropagation();
+      item.onclick = null;
       const inp = item.querySelector('.card-edit-input');
       if (inp) inp.remove();
       const displayed = displayFieldValue(key, newData[key], newData);
@@ -1819,9 +1819,6 @@ function buildCardFieldItem(doc, key) {
 
   item.appendChild(labelEl);
   item.appendChild(valueEl);
-
-  // Клик по полю не переворачивает карточку — редактирование через глобальный Edit
-  item.onclick = e => e.stopPropagation();
 
   return item;
 }
