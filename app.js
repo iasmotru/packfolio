@@ -1876,21 +1876,11 @@ async function renderDocsPage() {
   // Sticky-контейнер: поиск + фильтры
   const stickyControls = el('div', 'docs-sticky-controls');
 
-  const avatar = el('div', 'user-avatar');
-  const photoUrl = State.user?.photo_url || TG?.initDataUnsafe?.user?.photo_url;
-  if (photoUrl) {
-    const img = document.createElement('img');
-    img.src = photoUrl;
-    img.alt = '';
-    avatar.appendChild(img);
-  } else {
-    avatar.textContent = (State.user?.first_name?.[0] || '?').toUpperCase();
-  }
-  stickyControls.appendChild(avatar);
-
   const controlsCol = el('div', 'docs-controls-col');
 
-  const searchBar = el('div', 'search-bar');
+  // Строка поиска + кнопка «Архив» справа
+  const searchRow = el('div', 'docs-search-row');
+
   const searchInput = el('input', 'search-input');
   searchInput.placeholder = '🔍  Поиск документов...';
   searchInput.value = State.docFilters.q;
@@ -1898,8 +1888,19 @@ async function renderDocsPage() {
     State.docFilters.q = searchInput.value;
     applyDocFilters();
   }, 300);
-  searchBar.appendChild(searchInput);
-  controlsCol.appendChild(searchBar);
+  searchRow.appendChild(searchInput);
+
+  const archiveBtn = el('button', 'archive-icon-btn');
+  archiveBtn.title = 'Архив';
+  archiveBtn.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Архив</span>`;
+  archiveBtn.onclick = openArchiveModal;
+  searchRow.appendChild(archiveBtn);
+
+  controlsCol.appendChild(searchRow);
 
   const chips = el('div', 'filter-chips');
   FILTER_TYPES.forEach(({ val, label }) => {
@@ -1914,17 +1915,6 @@ async function renderDocsPage() {
 
   controlsCol.appendChild(chips);
   stickyControls.appendChild(controlsCol);
-
-  // Кнопка «Архив» — справа от колонки, симметрична аватарке
-  const archiveBtn = el('button', 'archive-icon-btn');
-  archiveBtn.title = 'Архив';
-  archiveBtn.innerHTML = `
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <span>Архив</span>`;
-  archiveBtn.onclick = openArchiveModal;
-  stickyControls.appendChild(archiveBtn);
 
   c.appendChild(stickyControls);
 
