@@ -1802,17 +1802,42 @@ function buildCardFieldItem(doc, key) {
 function openArchiveModal() {
   Modal.open(sheet => {
     sheet.classList.add('modal-full');
-    sheet.appendChild(Modal.buildHeader('Архив'));
 
-    const body = el('div', 'modal-body');
-    body.style.cssText = 'padding:0;flex:1;display:flex;flex-direction:column;overflow:hidden;';
+    // ── Хэдер — клон docs-sticky-controls ──
+    const header = el('div', 'docs-sticky-controls archive-modal-sticky');
 
-    // Фильтр-чипы внутри архива
+    const controlsCol = el('div', 'docs-controls-col');
+
+    // Строка: ← Назад | поиск | Очистить
+    const searchRow = el('div', 'docs-search-row');
+
+    const backBtn = el('button', 'archive-icon-btn');
+    backBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Назад</span>`;
+    backBtn.onclick = () => Modal.close();
+    searchRow.appendChild(backBtn);
+
+    let archiveQ = '';
+    const searchInput = el('input', 'search-input');
+    searchInput.placeholder = 'Поиск в архиве...';
+    searchInput.oninput = debounce(() => { archiveQ = searchInput.value; loadArchive(); }, 300);
+    searchRow.appendChild(searchInput);
+
+    const clearBtn = el('button', 'archive-icon-btn');
+    clearBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <span>Сбросить</span>`;
+    clearBtn.onclick = () => { searchInput.value = ''; archiveQ = ''; archiveDocType = ''; buildArchiveChips(); loadArchive(); };
+    searchRow.appendChild(clearBtn);
+
+    controlsCol.appendChild(searchRow);
+
+    // Чипы
     let archiveDocType = '';
-
     const chipsWrap = el('div', 'filter-chips');
-    chipsWrap.style.cssText = 'margin:12px 16px 4px;flex-shrink:0;';
-
     const buildArchiveChips = () => {
       chipsWrap.innerHTML = '';
       FILTER_TYPES.forEach(({ val, label }) => {
@@ -1821,14 +1846,22 @@ function openArchiveModal() {
         chipsWrap.appendChild(chip);
       });
     };
+    buildArchiveChips();
+    controlsCol.appendChild(chipsWrap);
 
+    header.appendChild(controlsCol);
+    sheet.appendChild(header);
+
+    // ── Список ──
     const list = el('div', 'card-list');
-    list.style.cssText = 'padding:0 16px;flex:1;overflow-y:auto;';
+    list.style.cssText = 'padding:0 16px;flex:1;overflow-y:auto;min-height:0;';
+    sheet.appendChild(list);
 
     const loadArchive = async () => {
       list.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
       try {
         const params = new URLSearchParams();
+        if (archiveQ) params.set('q', archiveQ);
         const isTransfer = archiveDocType === 'TRANSFER';
         if (archiveDocType && !isTransfer) params.set('doc_type', archiveDocType);
 
@@ -1856,10 +1889,6 @@ function openArchiveModal() {
       }
     };
 
-    buildArchiveChips();
-    body.appendChild(chipsWrap);
-    body.appendChild(list);
-    sheet.appendChild(body);
     loadArchive();
   });
 }
