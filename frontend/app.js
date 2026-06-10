@@ -1669,7 +1669,6 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
 
   // ─ Компактный заголовок: ← title [confidence] ─
   const header = el('div', 'doc-card-back-header doc-card-header-clickable');
-  header.onclick = () => onFlipBack();
 
   const backBtn = el('button', 'doc-card-back-btn', '');
   backBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -1705,7 +1704,7 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
     } else {
       previewWrap.innerHTML = `<div class="doc-preview-placeholder" style="padding:16px;font-size:12px">📎 Файл</div>`;
     }
-    previewWrap.onclick = () => window.open(`${CONFIG.API_BASE}/api/documents/${doc.id}/file`, '_blank');
+    previewWrap.onclick = (e) => { e.stopPropagation(); window.open(`${CONFIG.API_BASE}/api/documents/${doc.id}/file`, '_blank'); };
   } else {
     previewWrap.innerHTML = `<div class="doc-preview-placeholder" style="padding:16px;font-size:12px">📄 Файл не загружен</div>`;
   }
@@ -1763,7 +1762,9 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
       onFrontRefresh?.();
     } catch (err) { showToast('Ошибка: ' + err.message); }
   };
+  tripSelect.onclick = e => e.stopPropagation();
   tripRow.appendChild(tripSelect);
+  tripRow.onclick = e => e.stopPropagation();
   container.appendChild(tripRow);
 
   container.appendChild(el('div', 'doc-card-divider'));
@@ -1775,6 +1776,7 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   const tagsWrap = el('div', 'doc-card-back-tags');
   tagsWrap.style.cssText = 'flex:1;padding:0';
   tagsRow.appendChild(tagsWrap);
+  tagsRow.onclick = e => e.stopPropagation();
   container.appendChild(tagsRow);
   renderTagsEditor(tagsWrap, doc.tags || [], async (newTagIds) => {
     try {
@@ -1803,6 +1805,10 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   };
   delWrap.appendChild(delBtn);
   container.appendChild(delWrap);
+
+  // Клик в любое место обратной стороны — переворот назад
+  // (кнопки, превью, поездка, теги останавливают всплытие сами)
+  container.onclick = () => onFlipBack();
 }
 
 function buildCardFieldItem(doc, key) {
