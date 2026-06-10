@@ -917,6 +917,12 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   padding: 4px;
   margin: -4px;
 }
+.card-field-editable-active {
+  cursor: text;
+}
+.card-field-editable-active .doc-field-value {
+  border-bottom: 1px dashed rgba(70, 77, 245, 0.4);
+}
 
 .card-inline-input {
   width: 100%;
