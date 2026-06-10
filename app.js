@@ -1523,7 +1523,10 @@ function buildDocMiniCard(doc, showAllFields = false) {
     if (doc.tags?.length || trip) {
       const tagsDiv = el('div', 'doc-tags');
       if (trip) tagsDiv.appendChild(el('span', 'tag-pill tag-pill-trip', '✈️ ' + escHtml(trip.title)));
-      doc.tags?.forEach(t => tagsDiv.appendChild(el('span', 'tag-pill', escHtml(t.name))));
+      doc.tags?.forEach(t => {
+        const cls = t.kind === 'old_version' ? 'tag-pill tag-pill-old' : 'tag-pill';
+        tagsDiv.appendChild(el('span', cls, escHtml(t.name)));
+      });
       front.appendChild(tagsDiv);
     }
   }
@@ -2459,6 +2462,7 @@ function showSimilarModal(file, body, existingDoc) {
       const fd = new FormData();
       fd.append('file', file);
       fd.append('force', 'true');
+      fd.append('mark_old', 'true');
       let result;
       try { result = await API.postForm('/api/documents', fd); }
       catch (e) { showToast('Ошибка: ' + e.message); renderUploadStep1(body); return; }
