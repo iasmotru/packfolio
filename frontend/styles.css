@@ -312,7 +312,8 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   position: sticky;
   top: 8px;
   z-index: 19;
-  margin: 0 16px 8px;
+  width: min(312px, calc(100% - 32px));
+  margin: 0 auto 8px;
   padding: 12px 0 10px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
