@@ -1782,8 +1782,6 @@ async function renderDocsPage() {
   // Sticky-контейнер: поиск + фильтры
   const stickyControls = el('div', 'docs-sticky-controls');
 
-  const searchBar = el('div', 'search-bar');
-
   const avatar = el('div', 'user-avatar');
   const photoUrl = State.user?.photo_url || TG?.initDataUnsafe?.user?.photo_url;
   if (photoUrl) {
@@ -1794,8 +1792,11 @@ async function renderDocsPage() {
   } else {
     avatar.textContent = (State.user?.first_name?.[0] || '?').toUpperCase();
   }
-  searchBar.appendChild(avatar);
+  stickyControls.appendChild(avatar);
 
+  const controlsCol = el('div', 'docs-controls-col');
+
+  const searchBar = el('div', 'search-bar');
   const searchInput = el('input', 'search-input');
   searchInput.placeholder = '🔍  Поиск документов...';
   searchInput.value = State.docFilters.q;
@@ -1804,7 +1805,7 @@ async function renderDocsPage() {
     applyDocFilters();
   }, 300);
   searchBar.appendChild(searchInput);
-  stickyControls.appendChild(searchBar);
+  controlsCol.appendChild(searchBar);
 
   const chips = el('div', 'filter-chips');
   FILTER_TYPES.forEach(({ val, label }) => {
@@ -1816,7 +1817,8 @@ async function renderDocsPage() {
     };
     chips.appendChild(chip);
   });
-  stickyControls.appendChild(chips);
+  controlsCol.appendChild(chips);
+  stickyControls.appendChild(controlsCol);
 
   c.appendChild(stickyControls);
 
