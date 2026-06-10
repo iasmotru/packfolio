@@ -2800,7 +2800,16 @@ const App = {
     tgInit();
     State.user = TG?.initDataUnsafe?.user || { id: 1, first_name: 'Packfolio' };
 
-    // Аутентификация: получаем Bearer-токен
+    // Рендерим страницу сразу — не ждём сети
+    const initialTab = location.hash.replace('#', '') || 'trips';
+    this.navigate(initialTab);
+
+    window.addEventListener('hashchange', () => {
+      const tab = location.hash.replace('#', '') || 'trips';
+      if (tab !== State.currentTab) this.navigate(tab, true);
+    });
+
+    // Аутентификация и загрузка данных в фоне
     try {
       const ctrl = new AbortController();
       const authTimeout = setTimeout(() => ctrl.abort(), 8000);
@@ -2821,11 +2830,8 @@ const App = {
     }
 
     await loadAllData();
-    this.navigate(location.hash.replace('#', '') || 'trips');
-    window.addEventListener('hashchange', () => {
-      const tab = location.hash.replace('#', '') || 'home';
-      if (tab !== State.currentTab) this.navigate(tab, true);
-    });
+    // Перерисовываем текущую вкладку с загруженными данными
+    this.navigate(State.currentTab, true);
   },
 
   navigate(tab, fromHash = false) {
