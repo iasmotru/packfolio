@@ -505,15 +505,27 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   color: #fff;
 }
 
-/* Архив-чип: нейтральный стиль по умолчанию, активный — приглушённый */
-.chip.chip-archive {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+/* Кнопка перехода в архив — внизу списка документов */
+.archive-page-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 32px);
+  margin: 4px 16px 24px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-hint);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'Onest', sans-serif;
+  cursor: pointer;
+  transition: all .15s;
 }
-.chip.chip-archive.active {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.3);
+.archive-page-btn:active {
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text);
 }
 
