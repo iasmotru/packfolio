@@ -2909,9 +2909,10 @@ function debounce(fn, ms) {
 // ──────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+  const c = document.getElementById('page-content');
+  if (c) c.innerHTML = '<p style="color:#0f0;padding:20px;position:relative;z-index:999">JS OK</p>';
   App.init().catch(e => {
     console.error('App.init failed:', e);
-    const c = document.querySelector('#page-content');
-    if (c) c.innerHTML = `<div style="padding:24px;color:#ff4444;font-size:13px;word-break:break-all">${e.message}<br><br>${e.stack||''}</div>`;
+    if (c) c.innerHTML = `<div style="padding:24px;color:#ff4444;font-size:13px;word-break:break-all;position:relative;z-index:999">${e.message}<br><br>${e.stack||''}</div>`;
   });
 });
