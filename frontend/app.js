@@ -2815,12 +2815,17 @@ async function loadAllData() {
 
 const App = {
   async init() {
-    tgInit();
+    const _dbg = s => { const c = document.getElementById('page-content'); if (c) c.innerHTML += `<br><span style="color:yellow;font-size:12px">${s}</span>`; };
+    _dbg('init start');
+    try { tgInit(); } catch(e) { _dbg('tgInit err:' + e.message); }
+    _dbg('tgInit ok');
     State.user = TG?.initDataUnsafe?.user || { id: 1, first_name: 'Packfolio' };
-
-    // Рендерим страницу сразу — не ждём сети
-    const initialTab = location.hash.replace('#', '') || 'trips';
+    _dbg('user ok');
+    let initialTab;
+    try { initialTab = location.hash.replace('#', '') || 'trips'; } catch(e) { initialTab = 'trips'; _dbg('hash err:' + e.message); }
+    _dbg('tab:' + initialTab);
     this.navigate(initialTab);
+    _dbg('navigate ok');
 
     window.addEventListener('hashchange', () => {
       const tab = location.hash.replace('#', '') || 'trips';
