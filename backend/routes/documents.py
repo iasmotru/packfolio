@@ -12,7 +12,7 @@ from fastapi import (
     APIRouter, Depends, File, Form, HTTPException,
     Query, UploadFile, status,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -109,6 +109,16 @@ def set_document_tags(db: Session, doc: Document, tag_ids: List[int], user_id: i
             db.add(DocumentTag(document_id=doc.id, tag_id=tid))
 
 
+def _is_duplicate_data(existing: dict, new: dict) -> bool:
+    """True если все непустые поля new совпадают с existing (минимум 2 поля)."""
+    if not existing or not new:
+        return False
+    filled = {k: v for k, v in new.items() if v not in (None, "", [])}
+    if len(filled) < 2:
+        return False
+    return all(str(existing.get(k, "")) == str(v) for k, v in filled.items())
+
+
 # ──────────────────────────────────────────────
 # Эндпоинты
 # ──────────────────────────────────────────────
@@ -128,6 +138,7 @@ async def upload_document(
     title:   Optional[str] = Form(None),
     trip_id: Optional[int] = Form(None),
     tags:    Optional[str] = Form(None),   # JSON-array строка "[1,2,3]"
+    force:   bool          = Form(False),  # True = пропустить проверку дубликата
     user_id: int     = Depends(get_current_user_id),
     db:      Session = Depends(get_db),
 ):
@@ -144,6 +155,23 @@ async def upload_document(
 
     # Парсинг: segments — всегда список
     doc_type, confidence, segments = parse_document(file_path, mime)
+
+    # ── Проверка дубликата (пропускается при force=True) ──
+    if not force and doc_type != "UNKNOWN":
+        existing_docs = (
+            db.query(Document)
+            .join(WidgetData, WidgetData.document_id == Document.id)
+            .filter(Document.user_id == user_id, Document.doc_type == doc_type)
+            .all()
+        )
+        for seg in segments:
+            for ex in existing_docs:
+                if ex.widget_data and _is_duplicate_data(ex.widget_data.data, seg):
+                    os.remove(file_path)
+                    return JSONResponse(
+                        status_code=409,
+                        content={"duplicate": True, "existing": doc_to_dict(ex)},
+                    )
 
     is_multi = len(segments) >= 2
 
