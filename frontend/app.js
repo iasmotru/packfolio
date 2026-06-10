@@ -1503,34 +1503,23 @@ function buildDocMiniCard(doc, showAllFields = false) {
   }
 
   // ─── Enter edit mode ───────────────────────────────────────────────────────
-  // Поля остаются отображаемыми — инпут открывается только при клике на поле
+  // Все поля превращаются в инпуты; серая обводка → синяя при фокусе (как form-input)
   function enterEditMode() {
     isEditMode = true;
     editBtn.textContent = 'Сохранить';
     editBtn.classList.add('saving');
-    fieldRefs.forEach(({ key, item, valueEl }) => {
-      item.classList.add('card-field-editable-active');
-      item.onclick = (e) => {
-        e.stopPropagation();
-        openFieldInput(key, item, valueEl);
-      };
-    });
-  }
-
-  // ─── Open single field as input ───────────────────────────────────────────
-  function openFieldInput(key, item, valueEl) {
-    if (item.querySelector('.card-edit-input')) return;
     const wdata = doc.widget?.data || {};
-    valueEl.style.display = 'none';
-    const inp = el('input', 'card-edit-input');
-    inp.value = displayFieldValue(key, wdata[key], wdata) || '';
-    inp.dataset.editKey = key;
-    inp.onclick = e => e.stopPropagation();
-    if (DATETIME_FIELDS.has(key)) applyDatetimeMask(inp);
-    else if (DATE_FIELDS.has(key)) applyDateMask(inp);
-    else if (TIME_FIELDS.has(key)) applyTimeMask(inp);
-    item.appendChild(inp);
-    setTimeout(() => inp.focus(), 10);
+    fieldRefs.forEach(({ key, item, valueEl }) => {
+      valueEl.style.display = 'none';
+      const inp = el('input', 'card-edit-input');
+      inp.value = displayFieldValue(key, wdata[key], wdata) || '';
+      inp.dataset.editKey = key;
+      inp.onclick = e => e.stopPropagation();
+      if (DATETIME_FIELDS.has(key)) applyDatetimeMask(inp);
+      else if (DATE_FIELDS.has(key)) applyDateMask(inp);
+      else if (TIME_FIELDS.has(key)) applyTimeMask(inp);
+      item.appendChild(inp);
+    });
   }
 
   // ─── Save all edits ────────────────────────────────────────────────────────
@@ -1578,7 +1567,6 @@ function buildDocMiniCard(doc, showAllFields = false) {
     editBtn.classList.remove('saving');
     const newData = doc.widget?.data || {};
     fieldRefs.forEach(({ key, item, valueEl }) => {
-      item.classList.remove('card-field-editable-active');
       item.onclick = e => e.stopPropagation();
       const inp = item.querySelector('.card-edit-input');
       if (inp) inp.remove();
