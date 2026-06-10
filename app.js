@@ -904,6 +904,7 @@ function renderHomePage() {
   c.innerHTML = '';
   qs('#page-title').textContent = 'Главная';
   qs('#fab').classList.add('hidden');
+  document.body.classList.remove('has-fab');
 
   // Приветствие
   const greeting = el('div', '');
@@ -995,7 +996,8 @@ function renderTripsPage() {
   c.innerHTML = '';
   qs('#page-title').textContent = 'Поездки';
   qs('#fab').classList.remove('hidden');
-  qs('#fab').title = 'Новая поездка';
+  qs('#fab-label').textContent = 'Новая поездка';
+  document.body.classList.add('has-fab');
 
   if (!State.trips.length) {
     c.innerHTML = `
@@ -1774,7 +1776,8 @@ async function renderDocsPage() {
   c.innerHTML = '';
   qs('#page-title').textContent = 'Документы';
   qs('#fab').classList.remove('hidden');
-  qs('#fab').title = 'Загрузить документ';
+  qs('#fab-label').textContent = 'Загрузить документ';
+  document.body.classList.add('has-fab');
 
   // Sticky-контейнер: поиск + фильтры
   const stickyControls = el('div', 'docs-sticky-controls');
@@ -2492,6 +2495,7 @@ async function renderCalendarPage() {
   c.innerHTML = '';
   qs('#page-title').textContent = 'Календарь';
   qs('#fab').classList.add('hidden');
+  document.body.classList.remove('has-fab');
 
   // Обновляем поездки и события параллельно
   const [calData] = await Promise.all([
