@@ -1617,10 +1617,9 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
     openReplaceFileModal(doc.id, async () => { showToast('Файл заменён'); await applyDocFilters(); });
   };
 
-  const walletBtn = el('button', 'btn btn-secondary', '');
+  const walletBtn = el('button', 'btn btn-secondary btn-locked', '');
   walletBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet <span class="pro-badge">Pro</span>`;
-  walletBtn.disabled = true;
-  walletBtn.onclick = (e) => e.stopPropagation();
+  walletBtn.onclick = (e) => { e.stopPropagation(); openProModal(); };
 
   actions.appendChild(renameBtn);
   actions.appendChild(replaceBtn);
@@ -1982,9 +1981,9 @@ function renderDocDetailBody(body, doc) {
   });
   actions.appendChild(replaceBtn);
 
-  const walletBtn = el('button', 'btn btn-secondary', '');
+  const walletBtn = el('button', 'btn btn-secondary btn-locked', '');
   walletBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet <span class="pro-badge">Pro</span>`;
-  walletBtn.disabled = true;
+  walletBtn.onclick = () => openProModal();
   actions.appendChild(walletBtn);
 
   body.appendChild(actions);
@@ -2452,6 +2451,43 @@ function openReplaceFileModal(docId, onDone) {
         if (onDone) onDone(updated);
       } catch (e) { showToast('Ошибка: ' + e.message); }
     };
+  });
+}
+
+// ── Pro Modal ──
+
+function openProModal() {
+  Modal.open(sheet => {
+    sheet.appendChild(Modal.buildHeader('Доступно с подпиской'));
+    const body = el('div', 'modal-body');
+    body.innerHTML = `
+      <div style="padding:4px 0 20px">
+        <p style="color:var(--text-hint);font-size:14px;margin-bottom:20px">
+          Оформите подписку Pro, чтобы открыть новые возможности Packfolio:
+        </p>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px">
+          <li class="pro-feature-item">
+            <span class="pro-feature-icon">✈️</span>
+            <span>Создание поездок без ограничений</span>
+          </li>
+          <li class="pro-feature-item">
+            <span class="pro-feature-icon">🪪</span>
+            <span>Добавление документов в Wallet</span>
+          </li>
+          <li class="pro-feature-item">
+            <span class="pro-feature-icon">👥</span>
+            <span>Совместные поездки</span>
+          </li>
+        </ul>
+      </div>
+    `;
+    sheet.appendChild(body);
+    const footer = el('div', 'modal-footer');
+    const proBtn = el('button', 'btn btn-primary btn-full', '');
+    proBtn.innerHTML = `Оформить подписку Pro <span class="pro-badge" style="background:#fff;color:#464DF5">Pro</span>`;
+    proBtn.onclick = () => Modal.close();
+    footer.appendChild(proBtn);
+    sheet.appendChild(footer);
   });
 }
 
