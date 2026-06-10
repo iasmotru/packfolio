@@ -26,6 +26,7 @@ const State = {
   documents: [],
   // Фильтры для документов
   docFilters: { q: '', doc_type: '', trip_id: '', tag_id: '' },
+  docArchiveMode: false,
   // Выбранный месяц для календаря (YYYY-MM)
   calMonth: (() => {
     const d = new Date();
@@ -386,6 +387,26 @@ const SELECT_TYPES = [
 ];
 
 const TRANSFER_TYPES = new Set(['FLIGHT_TICKET', 'TRAIN_TICKET', 'BUS_TICKET']);
+
+// Возвращает «главную» дату документа (строка YYYY-MM-DD или YYYY-MM-DD HH:MM)
+function getDocPrimaryDate(doc) {
+  const data = doc.widget?.data || {};
+  if (TRANSFER_TYPES.has(doc.doc_type))      return data.departure_date  || null;
+  if (doc.doc_type === 'HOTEL_BOOKING')       return data.check_out       || data.check_in    || null;
+  if (doc.doc_type === 'CAR_RENTAL')          return data.dropoff_date    || data.pickup_date || null;
+  if (doc.doc_type === 'MEDICAL_INSURANCE')   return data.end_date        || data.start_date  || null;
+  return null;
+}
+
+// true, если главная дата документа раньше сегодняшнего дня
+function isDocPast(doc) {
+  const dateStr = getDocPrimaryDate(doc);
+  if (!dateStr) return false;
+  const isoDate = String(dateStr).slice(0, 10); // "YYYY-MM-DD"
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(isoDate) < today;
+}
 
 // Человекочитаемые названия полей виджета
 const WIDGET_LABELS = {
@@ -1816,14 +1837,25 @@ async function renderDocsPage() {
 
   const chips = el('div', 'filter-chips');
   FILTER_TYPES.forEach(({ val, label }) => {
-    const active = State.docFilters.doc_type === val;
+    const active = !State.docArchiveMode && State.docFilters.doc_type === val;
     const chip = el('button', `chip${active ? ' active' : ''}`, label);
     chip.onclick = () => {
+      State.docArchiveMode = false;
       State.docFilters.doc_type = val;
       renderDocsPage();
     };
     chips.appendChild(chip);
   });
+
+  // Кнопка «Архив»
+  const archiveChip = el('button', `chip chip-archive${State.docArchiveMode ? ' active' : ''}`, '🗂 Архив');
+  archiveChip.onclick = () => {
+    State.docArchiveMode = !State.docArchiveMode;
+    if (State.docArchiveMode) State.docFilters.doc_type = '';
+    renderDocsPage();
+  };
+  chips.appendChild(archiveChip);
+
   controlsCol.appendChild(chips);
   stickyControls.appendChild(controlsCol);
 
@@ -1859,9 +1891,20 @@ async function applyDocFilters(listEl) {
       docs = docs.filter(d => TRANSFER_TYPES.has(d.doc_type));
     }
 
+    // Архив/актуальные
+    if (docs) {
+      docs = docs.filter(d => State.docArchiveMode ? isDocPast(d) : !isDocPast(d));
+    }
+
     listEl.innerHTML = '';
 
     if (!docs || !docs.length) {
+      const emptyText = State.docArchiveMode
+        ? 'Архивных документов нет'
+        : 'Нет документов';
+      const emptyHint = State.docArchiveMode
+        ? 'Здесь будут документы с истёкшими датами'
+        : 'Загрузите PDF или фото документа нажав «+»';
       listEl.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">
@@ -1870,8 +1913,8 @@ async function applyDocFilters(listEl) {
               <path d="M14 2V8H20M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <strong>Нет документов</strong>
-          <p>Загрузите PDF или фото документа нажав «+»</p>
+          <strong>${emptyText}</strong>
+          <p>${emptyHint}</p>
         </div>`;
       return;
     }
