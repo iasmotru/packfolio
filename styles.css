@@ -427,7 +427,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 
 .search-input {
   flex: 1;
-  height: 32px;
+  height: 40px;
   box-sizing: border-box;
   background: rgba(70, 77, 245, 0.15);
   backdrop-filter: blur(12px);
@@ -488,7 +488,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 /* Кнопка «Архив» — справа от строки поиска */
 .archive-icon-btn {
   flex-shrink: 0;
-  height: 32px;
+  height: 40px;
   padding: 0 10px;
   align-self: center;
   border-radius: var(--radius);
