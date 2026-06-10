@@ -982,6 +982,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 
 .modal-sheet.modal-full {
+  height: 100dvh;
   max-height: 100dvh;
   border-radius: 0;
   border: none;
