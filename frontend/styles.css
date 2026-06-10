@@ -310,18 +310,17 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
 /* Закреплённые поиск + фильтры — подложка накрывает и шапку */
 .docs-sticky-controls {
   position: sticky;
-  top: -16px;
+  top: 8px;
   z-index: 19;
-  margin-top: -16px;
-  padding-top: 16px;
+  margin: 0 16px 8px;
+  padding: 12px 0 10px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  padding-bottom: 10px;
   background: rgba(70, 77, 245, 0.2);
-  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(70, 77, 245, 0.25);
   overflow: hidden;
 }
-
 
 .search-bar {
   padding: 14px var(--gap) 0;
@@ -331,7 +330,11 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
 }
 
 .docs-sticky-controls .search-bar {
-  padding-top: 0;
+  padding: 0 12px;
+}
+
+.docs-sticky-controls .filter-chips {
+  padding: 10px 12px 0;
 }
 
 .search-input {
