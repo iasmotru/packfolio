@@ -1811,7 +1811,7 @@ function openArchiveModal() {
     let archiveDocType = '';
 
     const chipsWrap = el('div', 'filter-chips');
-    chipsWrap.style.cssText = 'padding:0 16px 12px;flex-shrink:0;';
+    chipsWrap.style.cssText = 'margin:12px 16px 4px;flex-shrink:0;';
 
     const buildArchiveChips = () => {
       chipsWrap.innerHTML = '';
