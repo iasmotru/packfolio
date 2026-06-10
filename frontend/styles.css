@@ -924,6 +924,12 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   border-color: rgba(146,232,154,0.25);
 }
 
+.tag-pill-old {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
 /* Цвета бейджей по типам */
 .type-FLIGHT_TICKET     { background: rgba(96,165,250,0.12);  color: var(--c-flight); }
 .type-HOTEL_BOOKING     { background: rgba(52,211,153,0.12);  color: var(--c-hotel); }
