@@ -2148,6 +2148,7 @@ function renderDocDetailBody(body, doc) {
     const widgetCard = el('div', 'widget-card');
     const widgetDiv = el('div', 'widget-fields');
 
+    const extractedData = doc.widget?.extracted_data || {};
     visibleDetailFields.forEach(key => {
       const val = data[key];
       const row = buildWidgetFieldRow(key, val, async (newVal, extraPatch) => {
@@ -2157,7 +2158,7 @@ function renderDocDetailBody(body, doc) {
           Object.assign(doc.widget.data, patch);
           showToast('Сохранено');
         } catch (e) { showToast('Ошибка: ' + e.message); }
-      }, data);
+      }, data, extractedData[key]);
       widgetDiv.appendChild(row);
     });
 
@@ -2210,11 +2211,23 @@ function renderDocDetailBody(body, doc) {
   body.appendChild(delBtn);
 }
 
-function buildWidgetFieldRow(key, val, onSave, allData) {
+function buildWidgetFieldRow(key, val, onSave, allData, extractedVal) {
   const displayed = displayFieldValue(key, val, allData);
 
   const row = el('div', 'widget-field-row');
-  const label = el('div', 'widget-field-key', escHtml(WIDGET_LABELS[key] || key));
+
+  const label = el('div', 'widget-field-key');
+  label.appendChild(document.createTextNode(escHtml(WIDGET_LABELS[key] || key)));
+
+  // Бейдж «Изменено»: показываем только если оригинал был непустым и значение отличается
+  const isModified = extractedVal != null && extractedVal !== '' &&
+                     String(extractedVal) !== String(val ?? '');
+  let modifiedBadge = null;
+  if (isModified) {
+    modifiedBadge = el('span', 'field-modified-badge', 'Изменено');
+    label.appendChild(modifiedBadge);
+  }
+
   const valEl = el('div', `widget-field-val${!displayed ? ' empty' : ''}`,
     displayed ? escHtml(displayed) : 'не заполнено');
   const editBtn = el('button', 'widget-field-edit', 'изм.');
@@ -2256,6 +2269,16 @@ function buildWidgetFieldRow(key, val, onSave, allData) {
         const newDisplayed = displayFieldValue(key, newVal, allData);
         valEl.textContent = newDisplayed || 'не заполнено';
         valEl.className = `widget-field-val${!newDisplayed ? ' empty' : ''}`;
+        // Обновляем бейдж «Изменено»
+        const nowModified = extractedVal != null && extractedVal !== '' &&
+                            String(extractedVal) !== String(newVal ?? '');
+        if (nowModified && !modifiedBadge) {
+          modifiedBadge = el('span', 'field-modified-badge', 'Изменено');
+          label.appendChild(modifiedBadge);
+        } else if (!nowModified && modifiedBadge) {
+          modifiedBadge.remove();
+          modifiedBadge = null;
+        }
       } finally {
         input.remove();
         editBtn.style.display = '';
