@@ -364,7 +364,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: var(--bg-card);
   border-radius: var(--radius-sm);
   font-size: 15px;
