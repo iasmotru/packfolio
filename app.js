@@ -2861,14 +2861,18 @@ const App = {
     // Обновляем навигацию
     qsa('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 
-    if (tab === 'home') {
-      renderHomePage();
-    } else if (tab === 'trips') {
-      renderTripsPage();
-    } else if (tab === 'docs') {
-      renderDocsPage();
-    } else if (tab === 'calendar') {
-      renderCalendarPage();
+    try {
+      if (tab === 'home') {
+        renderHomePage();
+      } else if (tab === 'trips') {
+        renderTripsPage();
+      } else if (tab === 'docs') {
+        renderDocsPage();
+      } else if (tab === 'calendar') {
+        renderCalendarPage();
+      }
+    } catch (e) {
+      qs('#page-content').innerHTML = `<div style="padding:24px;color:var(--text-hint);text-align:center">${e.message}</div>`;
     }
   },
 
