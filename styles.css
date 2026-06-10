@@ -102,7 +102,7 @@ html, body {
   scrollbar-width: none;
 }
 .page::-webkit-scrollbar { display: none; }
-body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 24px); }
+body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
 
 /* ──────────────────────────────────────────────
    Шапка
@@ -206,12 +206,13 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 24px); }
 
 .fab {
   position: fixed;
-  bottom: calc(16px + 64px + 8px);
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
   width: min(312px, calc(100% - 32px));
-  height: 48px;
-  border-radius: var(--radius-lg);
+  height: calc(48px + 64px);
+  padding-bottom: 64px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   background: var(--grad-accent);
   color: #fff;
   border: none;
