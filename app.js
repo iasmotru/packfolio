@@ -1618,8 +1618,9 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   };
 
   const walletBtn = el('button', 'btn btn-secondary', '');
-  walletBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet`;
-  walletBtn.onclick = (e) => { e.stopPropagation(); addToWallet(doc); };
+  walletBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet <span class="pro-badge">Pro</span>`;
+  walletBtn.disabled = true;
+  walletBtn.onclick = (e) => e.stopPropagation();
 
   actions.appendChild(renameBtn);
   actions.appendChild(replaceBtn);
@@ -1982,8 +1983,8 @@ function renderDocDetailBody(body, doc) {
   actions.appendChild(replaceBtn);
 
   const walletBtn = el('button', 'btn btn-secondary', '');
-  walletBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet`;
-  walletBtn.onclick = () => addToWallet(doc);
+  walletBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet <span class="pro-badge">Pro</span>`;
+  walletBtn.disabled = true;
   actions.appendChild(walletBtn);
 
   body.appendChild(actions);
