@@ -1764,7 +1764,6 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   };
   tripSelect.onclick = e => e.stopPropagation();
   tripRow.appendChild(tripSelect);
-  tripRow.onclick = e => e.stopPropagation();
   container.appendChild(tripRow);
 
   container.appendChild(el('div', 'doc-card-divider'));
@@ -1775,8 +1774,8 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   tagsRow.appendChild(el('span', 'doc-card-back-row-label', 'Теги'));
   const tagsWrap = el('div', 'doc-card-back-tags');
   tagsWrap.style.cssText = 'flex:1;padding:0';
+  tagsWrap.onclick = e => e.stopPropagation();
   tagsRow.appendChild(tagsWrap);
-  tagsRow.onclick = e => e.stopPropagation();
   container.appendChild(tagsRow);
   renderTagsEditor(tagsWrap, doc.tags || [], async (newTagIds) => {
     try {
