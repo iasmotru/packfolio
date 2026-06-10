@@ -1783,6 +1783,19 @@ async function renderDocsPage() {
   const stickyControls = el('div', 'docs-sticky-controls');
 
   const searchBar = el('div', 'search-bar');
+
+  const avatar = el('div', 'user-avatar');
+  const photoUrl = State.user?.photo_url || TG?.initDataUnsafe?.user?.photo_url;
+  if (photoUrl) {
+    const img = document.createElement('img');
+    img.src = photoUrl;
+    img.alt = '';
+    avatar.appendChild(img);
+  } else {
+    avatar.textContent = (State.user?.first_name?.[0] || '?').toUpperCase();
+  }
+  searchBar.appendChild(avatar);
+
   const searchInput = el('input', 'search-input');
   searchInput.placeholder = '🔍  Поиск документов...';
   searchInput.value = State.docFilters.q;
