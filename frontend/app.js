@@ -2466,7 +2466,7 @@ function openProModal() {
         <p style="color:var(--text-hint);font-size:14px;margin-bottom:20px">
           Оформите подписку Pro, чтобы открыть новые возможности Packfolio:
         </p>
-        <ul style="list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:12px">
+        <ul style="list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:6px">
           <li class="pro-feature-item">
             <span class="pro-feature-icon">✈️</span>
             <span>Создание поездок без ограничений</span>
