@@ -2429,6 +2429,65 @@ function showDuplicateModal(file, body) {
   }, { noClose: true });
 }
 
+function showSimilarModal(file, body, existingDoc) {
+  Modal.open(sheet => {
+    sheet.appendChild(Modal.buildHeader('Есть похожий документ'));
+
+    const mbody = el('div', 'modal-body');
+
+    const hint = el('p', '', 'Найден документ с тем же номером рейса или PNR. Обновить его версию или загрузить как новый?');
+    hint.style.cssText = 'color:var(--text-hint);font-size:14px;line-height:1.5;margin:0;';
+    mbody.appendChild(hint);
+
+    // Карточка существующего документа
+    const cardWrap = el('div', '');
+    cardWrap.style.cssText = 'pointer-events:none;opacity:0.85;';
+    cardWrap.appendChild(buildDocMiniCard(existingDoc));
+    mbody.appendChild(cardWrap);
+
+    sheet.appendChild(mbody);
+
+    const footer = el('div', 'modal-footer');
+    footer.style.cssText = 'display:flex;gap:10px;';
+
+    const uploadNewBtn = el('button', 'btn btn-secondary', 'Загрузить новый');
+    uploadNewBtn.onclick = async () => {
+      Modal.close();
+      body.innerHTML = `
+        <div class="loader"><div class="spinner"></div></div>
+        <p style="text-align:center;color:var(--text-hint);margin-top:12px">Загружаем документ...</p>`;
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('force', 'true');
+      let result;
+      try { result = await API.postForm('/api/documents', fd); }
+      catch (e) { showToast('Ошибка: ' + e.message); renderUploadStep1(body); return; }
+      if (!result) { renderUploadStep1(body); return; }
+      if (Array.isArray(result)) { renderUploadStepMulti(body, result); return; }
+      renderUploadStep2(body, result);
+    };
+
+    const updateBtn = el('button', 'btn btn-primary', 'Обновить');
+    updateBtn.onclick = async () => {
+      Modal.close();
+      body.innerHTML = `
+        <div class="loader"><div class="spinner"></div></div>
+        <p style="text-align:center;color:var(--text-hint);margin-top:12px">Обновляем документ...</p>`;
+      const fd = new FormData();
+      fd.append('file', file);
+      let result;
+      try { result = await API.postForm(`/api/documents/${existingDoc.id}/replace`, fd); }
+      catch (e) { showToast('Ошибка: ' + e.message); renderUploadStep1(body); return; }
+      if (!result) { renderUploadStep1(body); return; }
+      renderUploadStep2(body, result);
+    };
+
+    footer.appendChild(uploadNewBtn);
+    footer.appendChild(updateBtn);
+    sheet.appendChild(footer);
+  }, { noClose: true });
+}
+
 async function handleFileSelected(file, body) {
   // Шаг 2: загружаем, ждём парсинга
   body.innerHTML = `
@@ -2455,6 +2514,11 @@ async function handleFileSelected(file, body) {
   if (!uploadResult) {
     showToast('Ошибка: не удалось загрузить документ');
     renderUploadStep1(body);
+    return;
+  }
+
+  if (uploadResult.similar) {
+    showSimilarModal(file, body, uploadResult.existing);
     return;
   }
 

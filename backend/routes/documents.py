@@ -119,6 +119,34 @@ def _is_duplicate_data(existing: dict, new: dict) -> bool:
     return all(str(existing.get(k, "")) == str(v) for k, v in filled.items())
 
 
+# Поля-идентификаторы: совпадение по любому означает «похожий» документ
+_SIMILAR_KEY_FIELDS = ["pnr", "flight_number", "booking_ref"]
+
+
+def _find_similar_doc(
+    db: Session, user_id: int, doc_type: str, segments: list
+) -> Optional["Document"]:
+    """Возвращает первый документ, у которого совпадает PNR/рейс, но данные отличаются."""
+    existing_docs = (
+        db.query(Document)
+        .join(WidgetData, WidgetData.document_id == Document.id)
+        .filter(Document.user_id == user_id, Document.doc_type == doc_type)
+        .all()
+    )
+    for seg in segments:
+        for key in _SIMILAR_KEY_FIELDS:
+            val = seg.get(key)
+            if not val:
+                continue
+            for ex in existing_docs:
+                ex_val = (ex.widget_data.data or {}).get(key) if ex.widget_data else None
+                if ex_val and str(ex_val) == str(val):
+                    # Совпадает идентификатор, но не все поля — это «похожий»
+                    if not _is_duplicate_data(ex.widget_data.data, seg):
+                        return ex
+    return None
+
+
 # ──────────────────────────────────────────────
 # Эндпоинты
 # ──────────────────────────────────────────────
@@ -172,6 +200,15 @@ async def upload_document(
                         status_code=409,
                         content={"duplicate": True, "existing": doc_to_dict(ex)},
                     )
+
+        # Проверка «похожего» документа (совпадает PNR/рейс, но данные отличаются)
+        similar = _find_similar_doc(db, user_id, doc_type, segments)
+        if similar:
+            os.remove(file_path)
+            return JSONResponse(
+                status_code=202,
+                content={"similar": True, "existing": doc_to_dict(similar)},
+            )
 
     is_multi = len(segments) >= 2
 
