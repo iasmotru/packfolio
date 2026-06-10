@@ -309,9 +309,8 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   font-weight: 700;
   letter-spacing: .4px;
   text-transform: uppercase;
-  background: rgba(70,77,245,0.3);
-  color: var(--accent);
-  border: 1px solid rgba(70,77,245,0.4);
+  background: #464DF5;
+  color: #fff;
   border-radius: 4px;
   padding: 1px 5px;
   vertical-align: middle;
