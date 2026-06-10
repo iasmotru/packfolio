@@ -1462,20 +1462,30 @@ function buildDocMiniCard(doc, showAllFields = false) {
   // ─── FRONT FACE ───────────────────────────────────────────────────────────
   const front = el('div', 'doc-card-face');
 
-  const header = el('div', 'doc-card-header doc-card-header-clickable');
+  // ─── Edit-mode state ──────────────────────────────────────────────────────
+  let isEditMode = false;
+  const fieldRefs = []; // { key, item, valueEl }
+
+  const editBtn = el('button', 'doc-card-edit-btn', 'Редактировать');
+  editBtn.onclick = (e) => {
+    e.stopPropagation();
+    isEditMode ? saveAllEdits() : enterEditMode();
+  };
+
+  const header = el('div', 'doc-card-header');
   header.innerHTML = `
     <div class="doc-type-badge ${info.color}">${info.icon}</div>
     <div class="doc-info">
       <div class="doc-title">${escHtml(doc.title)}</div>
     </div>
-    <div class="doc-card-arrow">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-        <path d="M12 3c4.97 0 9 4.03 9 9s-4.03 9-9 9-9-4.03-9-9 4.03-9 9-9zM12 8v4M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
   `;
-  header.onclick = () => doFlip();
+  header.appendChild(editBtn);
   front.appendChild(header);
+
+  // Flip by clicking anywhere on front (except interactive controls)
+  front.onclick = (e) => {
+    if (!isEditMode) doFlip();
+  };
 
   // Editable fields grid
   const visibleFields = fields.filter(key =>
@@ -1484,8 +1494,85 @@ function buildDocMiniCard(doc, showAllFields = false) {
   if (visibleFields.length) {
     front.appendChild(el('div', 'doc-card-divider'));
     const body = el('div', 'doc-card-body');
-    visibleFields.forEach(key => body.appendChild(buildCardFieldItem(doc, key)));
+    visibleFields.forEach(key => {
+      const item = buildCardFieldItem(doc, key);
+      body.appendChild(item);
+      fieldRefs.push({ key, item, valueEl: item.querySelector('.doc-field-value') });
+    });
     front.appendChild(body);
+  }
+
+  // ─── Enter edit mode ───────────────────────────────────────────────────────
+  function enterEditMode() {
+    isEditMode = true;
+    editBtn.textContent = 'Сохранить';
+    editBtn.classList.add('saving');
+    const wdata = doc.widget?.data || {};
+    fieldRefs.forEach(({ key, item, valueEl }) => {
+      valueEl.style.display = 'none';
+      const inp = el('input', 'card-edit-input');
+      inp.value = displayFieldValue(key, wdata[key], wdata) || '';
+      inp.dataset.editKey = key;
+      inp.onclick = e => e.stopPropagation();
+      if (DATETIME_FIELDS.has(key)) applyDatetimeMask(inp);
+      else if (DATE_FIELDS.has(key)) applyDateMask(inp);
+      else if (TIME_FIELDS.has(key)) applyTimeMask(inp);
+      item.appendChild(inp);
+    });
+  }
+
+  // ─── Save all edits ────────────────────────────────────────────────────────
+  async function saveAllEdits() {
+    const wdata = doc.widget?.data || {};
+    const patch = {};
+    fieldRefs.forEach(({ key, item }) => {
+      const inp = item.querySelector('.card-edit-input');
+      if (!inp) return;
+      const raw = inp.value.trim();
+      if (DATETIME_FIELDS.has(key)) {
+        const [isoDate, isoTime] = parseIsoDatetime(raw);
+        patch[key] = isoDate;
+        const timeKey = DATETIME_FIELDS_MAP[key];
+        if (isoTime && timeKey) patch[timeKey] = isoTime;
+      } else if (DATE_FIELDS.has(key)) {
+        patch[key] = toIsoDate(raw);
+      } else {
+        patch[key] = raw;
+      }
+    });
+    // Авто-пересчёт ночей
+    if ('check_in' in patch || 'check_out' in patch) {
+      const ci = patch.check_in ?? wdata.check_in;
+      const co = patch.check_out ?? wdata.check_out;
+      const nights = calcNights(ci, co);
+      if (nights !== null) patch.nights = String(nights);
+    }
+    try {
+      await API.put(`/api/documents/${doc.id}/widget`, patch);
+      if (!doc.widget) doc.widget = { data: {} };
+      if (!doc.widget.data) doc.widget.data = {};
+      Object.assign(doc.widget.data, patch);
+      showToast('Сохранено');
+    } catch (err) {
+      showToast('Ошибка: ' + err.message);
+    }
+    exitEditMode();
+  }
+
+  // ─── Exit edit mode ────────────────────────────────────────────────────────
+  function exitEditMode() {
+    isEditMode = false;
+    editBtn.textContent = 'Редактировать';
+    editBtn.classList.remove('saving');
+    const newData = doc.widget?.data || {};
+    fieldRefs.forEach(({ key, item, valueEl }) => {
+      const inp = item.querySelector('.card-edit-input');
+      if (inp) inp.remove();
+      const displayed = displayFieldValue(key, newData[key], newData);
+      valueEl.textContent = displayed || 'не заполнено';
+      valueEl.className = `doc-field-value${!displayed ? ' empty' : ''}`;
+      valueEl.style.display = '';
+    });
   }
 
   // UNKNOWN type selector
@@ -1731,78 +1818,8 @@ function buildCardFieldItem(doc, key) {
   item.appendChild(labelEl);
   item.appendChild(valueEl);
 
-  item.onclick = (e) => {
-    e.stopPropagation();
-    if (item.querySelector('.card-inline-input')) return;
-
-    valueEl.style.display = 'none';
-    const input = el('input', 'card-inline-input');
-    input.value = displayFieldValue(key, val, data) || '';
-    if (DATETIME_FIELDS.has(key)) applyDatetimeMask(input);
-    else if (DATE_FIELDS.has(key)) applyDateMask(input);
-    else if (TIME_FIELDS.has(key)) applyTimeMask(input);
-    else input.placeholder = WIDGET_LABELS[key] || key;
-    item.appendChild(input);
-
-    let saved = false;
-    const save = async () => {
-      if (saved) return;
-      saved = true;
-      const raw = input.value.trim();
-
-      let newVal, patch;
-      if (DATETIME_FIELDS.has(key)) {
-        const [isoDate, isoTime] = parseIsoDatetime(raw);
-        newVal = isoDate;
-        patch = { [key]: isoDate };
-        const timeKey = DATETIME_FIELDS_MAP[key];
-        if (isoTime) { patch[timeKey] = isoTime; }
-      } else {
-        newVal = DATE_FIELDS.has(key) ? toIsoDate(raw) : raw;
-        patch = { [key]: newVal };
-      }
-
-      // Авто-пересчёт ночей при изменении дат заезда/выезда
-      if (key === 'check_in' || key === 'check_out') {
-        if (!doc.widget) doc.widget = { data: {} };
-        if (!doc.widget.data) doc.widget.data = {};
-        const ci = key === 'check_in' ? newVal : doc.widget.data.check_in;
-        const co = key === 'check_out' ? newVal : doc.widget.data.check_out;
-        const nights = calcNights(ci, co);
-        if (nights !== null) patch.nights = String(nights);
-      }
-
-      try {
-        await API.put(`/api/documents/${doc.id}/widget`, patch);
-        if (!doc.widget) doc.widget = { data: {} };
-        if (!doc.widget.data) doc.widget.data = {};
-        Object.assign(doc.widget.data, patch);
-        val = newVal;
-        const newDisplayed = displayFieldValue(key, newVal, doc.widget.data);
-        valueEl.textContent = newDisplayed || 'не заполнено';
-        valueEl.className = `doc-field-value${!newDisplayed ? ' empty' : ''}`;
-
-        if (patch.nights !== undefined) {
-          const nightsEl = item.closest('.doc-card-body')?.querySelector('[data-field="nights"] .doc-field-value');
-          if (nightsEl) { nightsEl.textContent = patch.nights; nightsEl.classList.remove('empty'); }
-        }
-
-        showToast('Сохранено');
-      } catch (err) {
-        showToast('Ошибка: ' + err.message);
-      } finally {
-        input.remove();
-        valueEl.style.display = '';
-      }
-    };
-
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); save(); }
-      if (e.key === 'Escape') { saved = true; input.remove(); valueEl.style.display = ''; }
-    });
-    input.addEventListener('blur', save);
-    setTimeout(() => input.focus(), 10);
-  };
+  // Клик по полю не переворачивает карточку — редактирование через глобальный Edit
+  item.onclick = e => e.stopPropagation();
 
   return item;
 }
