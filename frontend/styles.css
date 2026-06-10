@@ -355,8 +355,8 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
 
 .user-avatar {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 64px;
+  height: 64px;
   align-self: center;
   border-radius: 50%;
   background: rgba(70, 77, 245, 0.3);
