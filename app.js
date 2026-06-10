@@ -1814,8 +1814,7 @@ function openArchiveModal() {
     const backBtn = el('button', 'archive-icon-btn');
     backBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
       <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <span>Назад</span>`;
+    </svg>`;
     backBtn.onclick = () => Modal.close();
     searchRow.appendChild(backBtn);
 
@@ -1826,11 +1825,23 @@ function openArchiveModal() {
     searchRow.appendChild(searchInput);
 
     const clearBtn = el('button', 'archive-icon-btn');
-    clearBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-    <span>Сбросить</span>`;
-    clearBtn.onclick = () => { searchInput.value = ''; archiveQ = ''; archiveDocType = ''; buildArchiveChips(); loadArchive(); };
+    clearBtn.innerHTML = `<span>Очистить</span>`;
+    clearBtn.onclick = async () => {
+      if (!confirm('Удалить все документы из архива?')) return;
+      clearBtn.disabled = true;
+      try {
+        const params = new URLSearchParams();
+        let docs = await API.get(`/api/documents?${params}`);
+        if (docs) docs = docs.filter(d => isDocPast(d));
+        await Promise.all((docs || []).map(d => API.delete(`/api/documents/${d.id}`)));
+        await loadAllData();
+        loadArchive();
+      } catch (e) {
+        showToast('Ошибка при удалении');
+      } finally {
+        clearBtn.disabled = false;
+      }
+    };
     searchRow.appendChild(clearBtn);
 
     controlsCol.appendChild(searchRow);
