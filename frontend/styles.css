@@ -310,14 +310,16 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
 /* Закреплённые поиск + фильтры — подложка накрывает и шапку */
 .docs-sticky-controls {
   position: sticky;
-  top: -8px;
+  top: -16px;
   z-index: 19;
   width: 100%;
-  margin: -8px 0 8px;
-  padding: 16px 0 10px;
+  margin: -16px 0 8px;
+  padding: 24px 0 20px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   background: rgba(4, 18, 29, 0.75);
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
 }
 
 .search-bar {
