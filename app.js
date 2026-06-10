@@ -26,7 +26,6 @@ const State = {
   documents: [],
   // Фильтры для документов
   docFilters: { q: '', doc_type: '', trip_id: '', tag_id: '' },
-  docArchiveMode: false,
   // Выбранный месяц для календаря (YYYY-MM)
   calMonth: (() => {
     const d = new Date();
@@ -1798,6 +1797,73 @@ function buildCardFieldItem(doc, key) {
   return item;
 }
 
+// ── Экран Архива ──
+
+function openArchiveModal() {
+  Modal.open(sheet => {
+    sheet.classList.add('modal-full');
+    sheet.appendChild(Modal.buildHeader('Архив'));
+
+    const body = el('div', 'modal-body');
+    body.style.cssText = 'padding:0;flex:1;display:flex;flex-direction:column;overflow:hidden;';
+
+    // Фильтр-чипы внутри архива
+    let archiveDocType = '';
+
+    const chipsWrap = el('div', 'filter-chips');
+    chipsWrap.style.cssText = 'padding:0 16px 12px;flex-shrink:0;';
+
+    const buildArchiveChips = () => {
+      chipsWrap.innerHTML = '';
+      FILTER_TYPES.forEach(({ val, label }) => {
+        const chip = el('button', `chip${archiveDocType === val ? ' active' : ''}`, label);
+        chip.onclick = () => { archiveDocType = val; buildArchiveChips(); loadArchive(); };
+        chipsWrap.appendChild(chip);
+      });
+    };
+
+    const list = el('div', 'card-list');
+    list.style.cssText = 'padding:0 16px;flex:1;overflow-y:auto;';
+
+    const loadArchive = async () => {
+      list.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+      try {
+        const params = new URLSearchParams();
+        const isTransfer = archiveDocType === 'TRANSFER';
+        if (archiveDocType && !isTransfer) params.set('doc_type', archiveDocType);
+
+        let docs = await API.get(`/api/documents?${params}`);
+        if (isTransfer && docs) docs = docs.filter(d => TRANSFER_TYPES.has(d.doc_type));
+        if (docs) docs = docs.filter(d => isDocPast(d));
+
+        list.innerHTML = '';
+        if (!docs || !docs.length) {
+          list.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                  <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <strong>Архив пуст</strong>
+              <p>Здесь будут документы с истёкшими датами</p>
+            </div>`;
+          return;
+        }
+        docs.forEach(doc => list.appendChild(buildDocMiniCard(doc)));
+      } catch (e) {
+        list.innerHTML = `<div class="empty-state"><p>Ошибка: ${e.message}</p></div>`;
+      }
+    };
+
+    buildArchiveChips();
+    body.appendChild(chipsWrap);
+    body.appendChild(list);
+    sheet.appendChild(body);
+    loadArchive();
+  });
+}
+
 async function renderDocsPage() {
   const c = qs('#page-content');
   c.innerHTML = '';
@@ -1837,24 +1903,14 @@ async function renderDocsPage() {
 
   const chips = el('div', 'filter-chips');
   FILTER_TYPES.forEach(({ val, label }) => {
-    const active = !State.docArchiveMode && State.docFilters.doc_type === val;
+    const active = State.docFilters.doc_type === val;
     const chip = el('button', `chip${active ? ' active' : ''}`, label);
     chip.onclick = () => {
-      State.docArchiveMode = false;
       State.docFilters.doc_type = val;
       renderDocsPage();
     };
     chips.appendChild(chip);
   });
-
-  // Кнопка «Архив»
-  const archiveChip = el('button', `chip chip-archive${State.docArchiveMode ? ' active' : ''}`, '🗂 Архив');
-  archiveChip.onclick = () => {
-    State.docArchiveMode = !State.docArchiveMode;
-    if (State.docArchiveMode) State.docFilters.doc_type = '';
-    renderDocsPage();
-  };
-  chips.appendChild(archiveChip);
 
   controlsCol.appendChild(chips);
   stickyControls.appendChild(controlsCol);
@@ -1865,6 +1921,16 @@ async function renderDocsPage() {
   const list = el('div', 'card-list', '');
   list.id = 'doc-list';
   c.appendChild(list);
+
+  // Кнопка «Архив» — внизу списка, открывает отдельный экран
+  const archiveBtn = el('button', 'archive-page-btn');
+  archiveBtn.innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Архив`;
+  archiveBtn.onclick = openArchiveModal;
+  c.appendChild(archiveBtn);
 
   await applyDocFilters(list);
 }
@@ -1891,20 +1957,14 @@ async function applyDocFilters(listEl) {
       docs = docs.filter(d => TRANSFER_TYPES.has(d.doc_type));
     }
 
-    // Архив/актуальные
+    // Основной список: только актуальные документы (без прошедших)
     if (docs) {
-      docs = docs.filter(d => State.docArchiveMode ? isDocPast(d) : !isDocPast(d));
+      docs = docs.filter(d => !isDocPast(d));
     }
 
     listEl.innerHTML = '';
 
     if (!docs || !docs.length) {
-      const emptyText = State.docArchiveMode
-        ? 'Архивных документов нет'
-        : 'Нет документов';
-      const emptyHint = State.docArchiveMode
-        ? 'Здесь будут документы с истёкшими датами'
-        : 'Загрузите PDF или фото документа нажав «+»';
       listEl.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">
@@ -1913,8 +1973,8 @@ async function applyDocFilters(listEl) {
               <path d="M14 2V8H20M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </div>
-          <strong>${emptyText}</strong>
-          <p>${emptyHint}</p>
+          <strong>Нет документов</strong>
+          <p>Загрузите PDF или фото документа нажав «+»</p>
         </div>`;
       return;
     }
