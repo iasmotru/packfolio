@@ -1915,22 +1915,23 @@ async function renderDocsPage() {
   controlsCol.appendChild(chips);
   stickyControls.appendChild(controlsCol);
 
+  // Кнопка «Архив» — справа от колонки, симметрична аватарке
+  const archiveBtn = el('button', 'archive-icon-btn');
+  archiveBtn.title = 'Архив';
+  archiveBtn.innerHTML = `
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Архив</span>`;
+  archiveBtn.onclick = openArchiveModal;
+  stickyControls.appendChild(archiveBtn);
+
   c.appendChild(stickyControls);
 
   // Список документов
   const list = el('div', 'card-list', '');
   list.id = 'doc-list';
   c.appendChild(list);
-
-  // Кнопка «Архив» — внизу списка, открывает отдельный экран
-  const archiveBtn = el('button', 'archive-page-btn');
-  archiveBtn.innerHTML = `
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-      <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    Архив`;
-  archiveBtn.onclick = openArchiveModal;
-  c.appendChild(archiveBtn);
 
   await applyDocFilters(list);
 }

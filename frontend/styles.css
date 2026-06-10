@@ -506,27 +506,32 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   font-weight: 600;
 }
 
-/* Кнопка перехода в архив — внизу списка документов */
-.archive-page-btn {
+/* Кнопка «Архив» — справа в sticky-controls, симметрична аватарке */
+.archive-icon-btn {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  align-self: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  width: calc(100% - 32px);
-  margin: 4px 16px 24px;
-  padding: 14px 16px;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
+  gap: 3px;
   color: var(--text-hint);
-  font-size: 14px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.archive-icon-btn span {
+  font-size: 10px;
   font-weight: 500;
   font-family: 'Onest', sans-serif;
-  cursor: pointer;
-  transition: all .15s;
+  line-height: 1;
 }
-.archive-page-btn:active {
-  background: rgba(255, 255, 255, 0.1);
+.archive-icon-btn:active {
+  background: rgba(255, 255, 255, 0.12);
   color: var(--text);
 }
 
