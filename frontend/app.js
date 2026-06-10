@@ -1524,7 +1524,9 @@ function buildDocMiniCard(doc, showAllFields = false) {
       const tagsDiv = el('div', 'doc-tags');
       if (trip) tagsDiv.appendChild(el('span', 'tag-pill tag-pill-trip', '✈️ ' + escHtml(trip.title)));
       doc.tags?.forEach(t => {
-        const cls = t.kind === 'old_version' ? 'tag-pill tag-pill-old' : 'tag-pill';
+        const cls = t.kind === 'old_version' ? 'tag-pill tag-pill-old'
+                  : t.kind === 'duplicate'   ? 'tag-pill tag-pill-dup'
+                  : 'tag-pill';
         tagsDiv.appendChild(el('span', cls, escHtml(t.name)));
       });
       front.appendChild(tagsDiv);
@@ -2412,6 +2414,7 @@ function showDuplicateModal(file, body) {
       const fd = new FormData();
       fd.append('file', file);
       fd.append('force', 'true');
+      fd.append('mark_duplicate', 'true');
       let uploadResult;
       try {
         uploadResult = await API.postForm('/api/documents', fd);

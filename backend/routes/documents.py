@@ -164,6 +164,46 @@ def _tag_old_versions(
                     tagged_ids.add(ex.id)
 
 
+def _tag_duplicates(
+    db: Session, user_id: int, doc_type: str, segments: list, new_doc_ids: list
+):
+    """Ставит тег «Дубликат» на новые документы и все их точные копии."""
+    dup_tag = (
+        db.query(Tag)
+        .filter(Tag.user_id == user_id, Tag.kind == "duplicate")
+        .first()
+    )
+    if not dup_tag:
+        dup_tag = Tag(user_id=user_id, name="Дубликат", kind="duplicate")
+        db.add(dup_tag)
+        db.flush()
+
+    def _ensure_tag(doc_id: int):
+        exists = db.query(DocumentTag).filter(
+            DocumentTag.document_id == doc_id,
+            DocumentTag.tag_id == dup_tag.id,
+        ).first()
+        if not exists:
+            db.add(DocumentTag(document_id=doc_id, tag_id=dup_tag.id))
+
+    # Тегируем новые документы
+    for nid in new_doc_ids:
+        _ensure_tag(nid)
+
+    # Находим существующие точные дубликаты и тегируем их тоже
+    existing_docs = (
+        db.query(Document)
+        .join(WidgetData, WidgetData.document_id == Document.id)
+        .filter(Document.user_id == user_id, Document.doc_type == doc_type)
+        .filter(Document.id.notin_(new_doc_ids))
+        .all()
+    )
+    for seg in segments:
+        for ex in existing_docs:
+            if ex.widget_data and _is_duplicate_data(ex.widget_data.data, seg):
+                _ensure_tag(ex.id)
+
+
 def _find_similar_doc(
     db: Session, user_id: int, doc_type: str, segments: list
 ) -> Optional["Document"]:
@@ -207,8 +247,9 @@ async def upload_document(
     title:   Optional[str] = Form(None),
     trip_id: Optional[int] = Form(None),
     tags:    Optional[str] = Form(None),   # JSON-array строка "[1,2,3]"
-    force:   bool          = Form(False),  # True = пропустить проверку дубликата
-    mark_old: bool         = Form(False),  # True = пометить похожие как «Старая версия»
+    force:          bool = Form(False),  # True = пропустить проверку дубликата
+    mark_old:       bool = Form(False),  # True = пометить похожие как «Старая версия»
+    mark_duplicate: bool = Form(False),  # True = пометить все копии как «Дубликат»
     user_id: int     = Depends(get_current_user_id),
     db:      Session = Depends(get_db),
 ):
@@ -308,6 +349,13 @@ async def upload_document(
     # Пометить похожие документы как «Старая версия»
     if mark_old and doc_type != "UNKNOWN":
         _tag_old_versions(db, user_id, doc_type, segments, [d.id for d in created_docs])
+        db.commit()
+        for doc in created_docs:
+            db.refresh(doc)
+
+    # Пометить дубликаты
+    if mark_duplicate and doc_type != "UNKNOWN":
+        _tag_duplicates(db, user_id, doc_type, segments, [d.id for d in created_docs])
         db.commit()
         for doc in created_docs:
             db.refresh(doc)
