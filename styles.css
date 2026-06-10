@@ -386,7 +386,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   top: -16px;
   z-index: 19;
   width: 100%;
-  margin: -16px 0 8px;
+  margin: -16px 0 -36px;
   padding: 24px 16px 52px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
