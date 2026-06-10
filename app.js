@@ -2703,7 +2703,7 @@ function renderCalendarTripFilters(container) {
     .sort((a, b) => a.start_date < b.start_date ? -1 : 1)[0];
 
   const chips = el('div', 'filter-chips');
-  chips.style.padding = '8px var(--gap) 0';
+  chips.style.margin = '8px var(--gap) 0';
 
   const jumpToTrip = async (trip) => {
     const [y, m] = trip.start_date.split('-');

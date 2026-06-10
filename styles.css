@@ -423,7 +423,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 
 .docs-sticky-controls .filter-chips {
-  padding: 8px 0 0;
+  margin: 8px 0 0;
 }
 
 .user-avatar {
@@ -469,40 +469,41 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 .search-input::placeholder { color: var(--text-hint); }
 
 /* ──────────────────────────────────────────────
-   Чипы-фильтры (из Figma: Chip, radius 24px, 8px V / 24px H)
+   Чипы-фильтры — стиль «папки Telegram»:
+   общая плашка-трек, внутри скользит активный пилл
    ────────────────────────────────────────────── */
 
 .filter-chips {
   display: flex;
-  gap: 8px;
-  padding: 10px var(--gap) 0;
+  gap: 2px;
+  padding: 3px;
   overflow-x: auto;
   scrollbar-width: none;
+  /* Единая плашка */
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-xl);
 }
 .filter-chips::-webkit-scrollbar { display: none; }
 
 .chip {
   flex-shrink: 0;
-  padding: 8px 24px;
-  border-radius: var(--radius-xl);
-  border: 1px solid rgba(70, 77, 245, 0.25);
-  background: rgba(70, 77, 245, 0.15);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  /* Caption M: 12px Medium (из Figma) */
-  font-size: 12px;
+  padding: 7px 16px;
+  border-radius: calc(var(--radius-xl) - 2px);
+  border: none;
+  background: transparent;
+  font-size: 13px;
   font-weight: 500;
   font-family: 'Onest', sans-serif;
-  color: var(--text);
+  color: var(--text-hint);
   cursor: pointer;
-  transition: all .15s;
+  transition: background .15s, color .15s;
   white-space: nowrap;
 }
 
 .chip.active {
   background: var(--accent);
-  border-color: var(--accent);
   color: #fff;
+  font-weight: 600;
 }
 
 /* Кнопка перехода в архив — внизу списка документов */
