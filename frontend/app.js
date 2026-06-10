@@ -2802,22 +2802,26 @@ const App = {
 
     // Аутентификация: получаем Bearer-токен
     try {
+      const ctrl = new AbortController();
+      const authTimeout = setTimeout(() => ctrl.abort(), 8000);
       const authRes = await fetch(CONFIG.API_BASE + '/api/auth/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ init_data: getInitData() }),
+        signal: ctrl.signal,
       });
+      clearTimeout(authTimeout);
       if (authRes.ok) {
         const authData = await authRes.json();
         State.token = authData.token || null;
         if (authData.user) State.user = authData.user;
       }
     } catch (_) {
-      // Сервер недоступен или dev-режим без токена
+      // Сервер недоступен, таймаут или dev-режим без токена
     }
 
     await loadAllData();
-    this.navigate(location.hash.replace('#', '') || 'home');
+    this.navigate(location.hash.replace('#', '') || 'trips');
     window.addEventListener('hashchange', () => {
       const tab = location.hash.replace('#', '') || 'home';
       if (tab !== State.currentTab) this.navigate(tab, true);
