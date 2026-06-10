@@ -1882,7 +1882,7 @@ async function renderDocsPage() {
   const searchRow = el('div', 'docs-search-row');
 
   const searchInput = el('input', 'search-input');
-  searchInput.placeholder = '🔍  Поиск документов...';
+  searchInput.placeholder = 'Поиск документов...';
   searchInput.value = State.docFilters.q;
   searchInput.oninput = debounce(() => {
     State.docFilters.q = searchInput.value;
