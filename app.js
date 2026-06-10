@@ -79,7 +79,12 @@ const API = {
     if (res.status === 204) return null;
 
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    if (!res.ok) {
+      const err = new Error(data.detail || `HTTP ${res.status}`);
+      err.status = res.status;
+      err.data = data;
+      throw err;
+    }
     return data;
   },
 
@@ -2381,6 +2386,49 @@ function renderUploadStep1(body) {
   fileInput.onchange = () => { if (fileInput.files[0]) handleFileSelected(fileInput.files[0], body); };
 }
 
+function showDuplicateModal(file, body) {
+  Modal.open(sheet => {
+    sheet.appendChild(Modal.buildHeader('Документ уже загружен'));
+    const mbody = el('div', 'modal-body');
+    mbody.innerHTML = `
+      <p style="color:var(--text-hint);font-size:14px;line-height:1.5">
+        Этот документ уже был загружен ранее. Загрузить его повторно?
+      </p>`;
+    const footer = el('div', 'modal-footer');
+    footer.style.cssText = 'display:flex;gap:10px;';
+
+    const cancelBtn = el('button', 'btn btn-secondary', 'Отменить');
+    cancelBtn.onclick = () => { Modal.close(); Modal.close(); }; // закрыть дубликат + загрузку
+
+    const reuploadBtn = el('button', 'btn btn-primary', 'Загрузить повторно');
+    reuploadBtn.onclick = async () => {
+      Modal.close(); // закрыть этот диалог
+      body.innerHTML = `
+        <div class="loader"><div class="spinner"></div></div>
+        <p style="text-align:center;color:var(--text-hint);margin-top:12px">Загружаем документ...</p>`;
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('force', 'true');
+      let uploadResult;
+      try {
+        uploadResult = await API.postForm('/api/documents', fd);
+      } catch (e) {
+        showToast('Ошибка загрузки: ' + e.message);
+        renderUploadStep1(body);
+        return;
+      }
+      if (!uploadResult) { renderUploadStep1(body); return; }
+      if (Array.isArray(uploadResult)) { renderUploadStepMulti(body, uploadResult); return; }
+      renderUploadStep2(body, uploadResult);
+    };
+
+    footer.appendChild(cancelBtn);
+    footer.appendChild(reuploadBtn);
+    sheet.appendChild(mbody);
+    sheet.appendChild(footer);
+  }, { noClose: true });
+}
+
 async function handleFileSelected(file, body) {
   // Шаг 2: загружаем, ждём парсинга
   body.innerHTML = `
@@ -2395,6 +2443,10 @@ async function handleFileSelected(file, body) {
   try {
     uploadResult = await API.postForm('/api/documents', fd);
   } catch (e) {
+    if (e.status === 409 && e.data?.duplicate) {
+      showDuplicateModal(file, body);
+      return;
+    }
     showToast('Ошибка загрузки: ' + e.message);
     renderUploadStep1(body);
     return;
