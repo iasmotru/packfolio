@@ -20,6 +20,7 @@ const State = {
   token: null,
   user: null,
   currentTab: 'trips',
+  loaded: false,
   trips: [],
   tags: [],
   documents: [],
@@ -904,6 +905,7 @@ function renderHomePage() {
   qs('#page-title').textContent = 'Главная';
   qs('#fab').classList.add('hidden');
   document.body.classList.remove('has-fab');
+  if (!State.loaded) { c.innerHTML = '<div class="loader"><div class="spinner"></div></div>'; return; }
 
   // Приветствие
   const greeting = el('div', '');
@@ -997,6 +999,11 @@ function renderTripsPage() {
   qs('#fab').classList.remove('hidden');
   qs('#fab-label').textContent = 'Новая поездка';
   document.body.classList.add('has-fab');
+
+  if (!State.loaded) {
+    c.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    return;
+  }
 
   if (!State.trips.length) {
     c.innerHTML = `
@@ -1776,6 +1783,7 @@ async function renderDocsPage() {
   qs('#page-title').textContent = 'Документы';
   qs('#fab').classList.remove('hidden');
   qs('#fab-label').textContent = 'Загрузить документ';
+  if (!State.loaded) { c.innerHTML = '<div class="loader"><div class="spinner"></div></div>'; return; }
   document.body.classList.add('has-fab');
 
   // Sticky-контейнер: поиск + фильтры
@@ -2508,6 +2516,7 @@ async function renderCalendarPage() {
   const c = qs('#page-content');
   c.innerHTML = '';
   qs('#page-title').textContent = 'Календарь';
+  if (!State.loaded) { c.innerHTML = '<div class="loader"><div class="spinner"></div></div>'; return; }
   qs('#fab').classList.add('hidden');
   document.body.classList.remove('has-fab');
 
@@ -2849,6 +2858,7 @@ const App = {
     }
 
     await loadAllData();
+    State.loaded = true;
     // Перерисовываем текущую вкладку с загруженными данными
     this.navigate(State.currentTab, true);
   },
