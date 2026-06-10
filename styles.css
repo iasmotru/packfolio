@@ -215,11 +215,13 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   height: calc(48px + 64px);
   padding-bottom: 64px;
   border-radius: var(--radius-lg) var(--radius-lg) var(--radius-xl) var(--radius-xl);
-  background: var(--grad-accent);
+  background: rgba(70, 77, 245, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: #fff;
-  border: none;
+  border: 1px solid rgba(70, 77, 245, 0.25);
   cursor: pointer;
-  box-shadow: var(--shadow-accent);
+  box-shadow: var(--shadow);
   display: flex;
   align-items: center;
   justify-content: center;
