@@ -15,6 +15,7 @@ from fastapi import (
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from auth import get_current_user_id
 from models import Document, DocumentTag, Tag, WidgetData, get_db
@@ -91,7 +92,7 @@ def doc_to_dict(doc: Document) -> dict:
         "widget": {
             "id":             wd.id             if wd else None,
             "data":           wd.data           if wd else {},
-            "extracted_data": wd.extracted_data if wd else {},
+            "extracted_data": (wd.extracted_data or {}) if wd else {},
             "confidence":     wd.confidence     if wd else 0.0,
             "last_parsed_at": wd.last_parsed_at.isoformat() if wd and wd.last_parsed_at else None,
         } if wd else None,
@@ -462,10 +463,17 @@ def patch_widget(
         db.add(wd)
         db.flush()
 
+    # Если extracted_data пустой (легасси-документ) — фиксируем текущее data
+    # как эталон перед первым редактированием, чтобы бейдж «Изменено» работал
+    if not wd.extracted_data:
+        wd.extracted_data = dict(wd.data or {})
+        flag_modified(wd, 'extracted_data')
+
     # Мержим новые поля поверх существующих
     current = dict(wd.data or {})
     current.update(body)
     wd.data = current
+    flag_modified(wd, 'data')
 
     doc.updated_at = datetime.utcnow()
     db.commit()
