@@ -831,20 +831,25 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 .doc-card-edit-btn:active { opacity: .8; }
 
-/* Инпут в режиме редактирования карточки */
+/* Инпут в режиме редактирования карточки — поведение как form-input */
 .card-edit-input {
   width: 100%;
-  height: 30px;
-  margin-top: 3px;
+  height: 32px;
+  margin-top: 4px;
   padding: 0 8px;
   font-size: 13px;
   font-family: 'Onest', sans-serif;
   background: var(--bg-input);
-  border: 1.5px solid var(--accent);
-  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
   color: var(--text);
   outline: none;
   box-sizing: border-box;
+  transition: border-color .15s, background .15s;
+}
+.card-edit-input:focus {
+  border-color: var(--accent);
+  background: rgba(70, 77, 245, 0.05);
 }
 
 .doc-type-badge {
@@ -916,12 +921,6 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   border-radius: 8px;
   padding: 4px;
   margin: -4px;
-}
-.card-field-editable-active {
-  cursor: text;
-}
-.card-field-editable-active .doc-field-value {
-  border-bottom: 1px dashed rgba(70, 77, 245, 0.4);
 }
 
 .card-inline-input {
