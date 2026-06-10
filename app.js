@@ -2815,20 +2815,16 @@ async function loadAllData() {
 
 const App = {
   async init() {
-    const _dbg = s => { const c = document.getElementById('page-content'); if (c) c.innerHTML += `<br><span style="color:yellow;font-size:12px">${s}</span>`; };
-    _dbg('init start');
-    try { tgInit(); } catch(e) { _dbg('tgInit err:' + e.message); }
-    _dbg('tgInit ok');
+    tgInit();
     State.user = TG?.initDataUnsafe?.user || { id: 1, first_name: 'Packfolio' };
-    _dbg('user ok');
-    let initialTab;
-    try { initialTab = location.hash.replace('#', '') || 'trips'; } catch(e) { initialTab = 'trips'; _dbg('hash err:' + e.message); }
-    _dbg('tab:' + initialTab);
+
+    const TABS = ['home', 'trips', 'docs', 'calendar'];
+    const initialTab = TABS.includes(location.hash.replace('#', '')) ? location.hash.replace('#', '') : 'trips';
     this.navigate(initialTab);
-    _dbg('navigate ok');
 
     window.addEventListener('hashchange', () => {
-      const tab = location.hash.replace('#', '') || 'trips';
+      const h = location.hash.replace('#', '');
+      const tab = TABS.includes(h) ? h : State.currentTab;
       if (tab !== State.currentTab) this.navigate(tab, true);
     });
 
@@ -2913,11 +2909,4 @@ function debounce(fn, ms) {
 // Старт
 // ──────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
-  const c = document.getElementById('page-content');
-  if (c) c.innerHTML = '<p style="color:#0f0;padding:20px;position:relative;z-index:999">JS OK</p>';
-  App.init().catch(e => {
-    console.error('App.init failed:', e);
-    if (c) c.innerHTML = `<div style="padding:24px;color:#ff4444;font-size:13px;word-break:break-all;position:relative;z-index:999">${e.message}<br><br>${e.stack||''}</div>`;
-  });
-});
+document.addEventListener('DOMContentLoaded', () => App.init());
