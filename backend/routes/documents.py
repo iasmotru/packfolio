@@ -186,11 +186,7 @@ def _tag_duplicates(
         if not exists:
             db.add(DocumentTag(document_id=doc_id, tag_id=dup_tag.id))
 
-    # Тегируем новые документы
-    for nid in new_doc_ids:
-        _ensure_tag(nid)
-
-    # Находим существующие точные дубликаты и тегируем их тоже
+    # Находим существующие точные дубликаты и тегируем их
     existing_docs = (
         db.query(Document)
         .join(WidgetData, WidgetData.document_id == Document.id)
