@@ -318,7 +318,7 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   line-height: 1.5;
 }
 
-button:disabled { opacity: 0.5; cursor: default; }
+button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--border); cursor: default; }
 
 /* ──────────────────────────────────────────────
    Поиск
