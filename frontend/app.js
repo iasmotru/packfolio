@@ -1749,6 +1749,22 @@ function buildDocMiniCard(doc, showAllFields = false) {
         await API.put(`/api/documents/${doc.id}`, { title: newTitle });
         doc.title = newTitle;
       }
+      // Обновляем бейджи «Изменено» на полях
+      const extractedData = doc.widget?.extracted_data || {};
+      fieldRefs.forEach(({ key, item }) => {
+        const labelEl = item.querySelector('.doc-field-label');
+        if (!labelEl) return;
+        const newVal = doc.widget.data[key];
+        const extractedVal = extractedData[key];
+        const nowModified = extractedVal != null && extractedVal !== '' &&
+                            String(extractedVal) !== String(newVal ?? '');
+        const existing = labelEl.querySelector('.field-modified-badge');
+        if (nowModified && !existing) {
+          labelEl.appendChild(el('span', 'field-modified-badge', 'Изменено'));
+        } else if (!nowModified && existing) {
+          existing.remove();
+        }
+      });
       showToast('Сохранено');
     } catch (err) {
       showToast('Ошибка: ' + err.message);
@@ -2033,13 +2049,23 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
 
 function buildCardFieldItem(doc, key) {
   const data = doc.widget?.data || {};
-  let val = data[key];
+  const extractedData = doc.widget?.extracted_data || {};
+  const val = data[key];
+  const extractedVal = extractedData[key];
 
   const displayed = displayFieldValue(key, val, data);
 
   const item = el('div', 'doc-field doc-field-editable');
   item.dataset.field = key;
   const labelEl = el('div', 'doc-field-label', escHtml(WIDGET_LABELS[key] || key));
+
+  // Бейдж «Изменено» — если оригинал был непустым и значение отличается
+  const isModified = extractedVal != null && extractedVal !== '' &&
+                     String(extractedVal) !== String(val ?? '');
+  if (isModified) {
+    labelEl.appendChild(el('span', 'field-modified-badge', 'Изменено'));
+  }
+
   const valueEl = el('div', `doc-field-value${!displayed ? ' empty' : ''}`,
     displayed ? escHtml(displayed) : 'не заполнено');
 
