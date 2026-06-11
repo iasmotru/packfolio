@@ -1559,7 +1559,8 @@ function buildDocMiniCard(doc, showAllFields = false) {
       if (!isEditMode) return;
       if (card.contains(e.target)) return;
       if (e.target.closest('.datepicker-popup, .timepicker-popup')) return;
-      if (e.target.closest('.modal-overlay')) return;
+      // Игнорируем клики внутри самого диалога подтверждения, но НЕ архивного оверлея
+      if (e.target.closest('.modal-overlay.center')) return;
       showSaveConfirmDialog();
     };
     setTimeout(() => {
