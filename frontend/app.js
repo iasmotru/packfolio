@@ -2606,6 +2606,8 @@ function renderTagsEditor(container, currentTags, onUpdate) {
 
     const selectedDiv = el('div', 'selected-tags');
     selectedTags.forEach(tag => {
+      // Тег «Дубликат» — системный, не отображаем в редакторе
+      if (tag.kind === 'duplicate') return;
       const pill = el('div', 'selected-tag');
       pill.innerHTML = `${escHtml(tag.name)} <button class="selected-tag-remove" data-id="${tag.id}">×</button>`;
       pill.querySelector('button').onclick = () => {
