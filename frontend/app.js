@@ -111,12 +111,15 @@ function el(tag, cls, html) {
   return e;
 }
 
-/** Перемещает курсор в конец значения при фокусе */
+/** Перемещает курсор и видимую область инпута в конец значения при фокусе */
 function moveCursorToEnd(input) {
   input.addEventListener('focus', () => {
-    const len = input.value.length;
     // setTimeout нужен для iOS — браузер сбрасывает позицию после focus
-    setTimeout(() => input.setSelectionRange(len, len), 0);
+    setTimeout(() => {
+      const len = input.value.length;
+      input.setSelectionRange(len, len);
+      input.scrollLeft = input.scrollWidth;
+    }, 0);
   });
 }
 
