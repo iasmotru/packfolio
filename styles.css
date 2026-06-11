@@ -667,8 +667,10 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  margin: 0 var(--gap);
+  margin: 10px var(--gap) 0;
 }
+
+.swipe-wrap:first-child { margin-top: 14px; }
 
 .swipe-wrap .doc-card {
   margin: 0; /* margin перенесён в .swipe-wrap */
