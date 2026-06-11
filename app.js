@@ -543,18 +543,14 @@ function createDatePicker(anchorEl, onSelect) {
     const header = el('div', 'dp-header');
     const prevBtn = el('button', 'dp-nav', '&#8249;');
     prevBtn.type = 'button';
-    prevBtn.addEventListener('mousedown', e => {
-      e.preventDefault();
-      if (--viewMonth < 0) { viewMonth = 11; viewYear--; }
-      render();
-    });
+    const onPrev = e => { e.preventDefault(); if (--viewMonth < 0) { viewMonth = 11; viewYear--; } render(); };
+    prevBtn.addEventListener('mousedown', onPrev);
+    prevBtn.addEventListener('touchend', onPrev);
     const nextBtn = el('button', 'dp-nav', '&#8250;');
     nextBtn.type = 'button';
-    nextBtn.addEventListener('mousedown', e => {
-      e.preventDefault();
-      if (++viewMonth > 11) { viewMonth = 0; viewYear++; }
-      render();
-    });
+    const onNext = e => { e.preventDefault(); if (++viewMonth > 11) { viewMonth = 0; viewYear++; } render(); };
+    nextBtn.addEventListener('mousedown', onNext);
+    nextBtn.addEventListener('touchend', onNext);
     const title = el('div', 'dp-title', `${DP_MONTHS[viewMonth]} ${viewYear}`);
     header.appendChild(prevBtn);
     header.appendChild(title);
