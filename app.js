@@ -3292,4 +3292,44 @@ function debounce(fn, ms) {
 // Старт
 // ──────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => App.init());
+document.addEventListener('DOMContentLoaded', () => {
+  App.init();
+  setupKeyboardAdjust();
+});
+
+// ──────────────────────────────────────────────
+// Keyboard / visualViewport fix (iOS Telegram)
+// ──────────────────────────────────────────────
+function setupKeyboardAdjust() {
+  // Скроллим активный инпут в зону видимости при фокусе
+  document.addEventListener('focusin', (e) => {
+    if (!e.target.matches('input, textarea, select')) return;
+    setTimeout(() => {
+      e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 320); // ждём анимацию клавиатуры
+  });
+
+  // Уменьшаем высоту modal-overlay до реальной видимой области
+  if (!window.visualViewport) return;
+  const onViewportResize = () => {
+    const vv = window.visualViewport;
+    const visibleH = Math.round(vv.height);
+    const offsetTop = Math.round(vv.offsetTop);
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.style.height  = visibleH + 'px';
+      overlay.style.top     = offsetTop + 'px';
+      overlay.style.bottom  = '';
+    });
+  };
+  const onViewportRestore = () => {
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.style.height = '';
+      overlay.style.top    = '';
+    });
+  };
+
+  window.visualViewport.addEventListener('resize', () => {
+    const keyboardVisible = window.visualViewport.height < window.innerHeight * 0.85;
+    keyboardVisible ? onViewportResize() : onViewportRestore();
+  });
+}
