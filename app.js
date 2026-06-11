@@ -615,11 +615,28 @@ function createDatePicker(anchorEl, onSelect) {
     }
   };
 
-  const destroy = () => popup.remove();
+  const destroy = () => {
+    document.removeEventListener('mousedown', onOutside);
+    document.removeEventListener('touchend', onOutside);
+    popup.remove();
+  };
+
+  // Закрываем пикер при тапе вне попапа и вне якорного инпута
+  const onOutside = (e) => {
+    if (!popup.contains(e.target) && e.target !== anchorEl) {
+      destroy();
+    }
+  };
 
   render();
   document.body.appendChild(popup);
   position();
+
+  // Регистрируем с задержкой, чтобы открывающий тап не закрыл пикер сразу
+  setTimeout(() => {
+    document.addEventListener('mousedown', onOutside);
+    document.addEventListener('touchend', onOutside);
+  }, 80);
 
   return { destroy, highlight: (isoDate) => { selDate = isoDate; render(); } };
 }
