@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth import get_current_user_id
-from models import Trip, get_db
+from models import Trip, TripShare, get_db
 
 router = APIRouter(prefix="/api/trips", tags=["trips"])
 
@@ -38,15 +38,16 @@ class TripUpdate(BaseModel):
 
 
 class TripOut(BaseModel):
-    id:         int
-    user_id:    int
-    title:      str
-    locations:  Optional[str]
-    start_date: Optional[str]
-    end_date:   Optional[str]
-    note:       Optional[str]
-    is_shared:  bool = False
-    created_at: datetime
+    id:          int
+    user_id:     int
+    title:       str
+    locations:   Optional[str]
+    start_date:  Optional[str]
+    end_date:    Optional[str]
+    note:        Optional[str]
+    is_shared:   bool = False
+    created_at:  datetime
+    access_role: str = "owner"   # "owner" | "editor" | "reader"
 
     class Config:
         from_attributes = True
@@ -56,12 +57,43 @@ class TripOut(BaseModel):
 # Эндпоинты
 # ──────────────────────────────────────────────
 
-@router.get("", response_model=List[TripOut])
+@router.get("")
 def list_trips(
     user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
-    return db.query(Trip).filter(Trip.user_id == user_id).order_by(Trip.created_at.desc()).all()
+    # Собственные поездки
+    owned = db.query(Trip).filter(Trip.user_id == user_id).order_by(Trip.created_at.desc()).all()
+
+    # Принятые расшаренные поездки
+    shares = db.query(TripShare).filter(
+        TripShare.member_id == user_id,
+        TripShare.accepted == True,
+    ).all()
+    owned_ids = {t.id for t in owned}
+    shares_map = {s.trip_id: s.role for s in shares}
+    shared_ids = set(shares_map.keys()) - owned_ids
+
+    shared = db.query(Trip).filter(Trip.id.in_(shared_ids)).all() if shared_ids else []
+
+    def _trip_dict(trip: Trip, role: str) -> dict:
+        return {
+            "id":          trip.id,
+            "user_id":     trip.user_id,
+            "title":       trip.title,
+            "locations":   trip.locations,
+            "start_date":  trip.start_date,
+            "end_date":    trip.end_date,
+            "note":        trip.note,
+            "is_shared":   trip.is_shared,
+            "created_at":  trip.created_at.isoformat() if trip.created_at else None,
+            "access_role": role,
+        }
+
+    result = [_trip_dict(t, "owner") for t in owned]
+    result += [_trip_dict(t, shares_map[t.id]) for t in shared]
+    result.sort(key=lambda x: x["created_at"] or "", reverse=True)
+    return result
 
 
 @router.post("", response_model=TripOut, status_code=status.HTTP_201_CREATED)

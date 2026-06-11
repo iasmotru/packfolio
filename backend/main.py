@@ -29,7 +29,7 @@ from models import (
     Document, DocumentTag, Tag, Trip, User, WidgetData,
     create_tables, get_db,
 )
-from routes import calendar, documents, tags, trips, wallet_routes
+from routes import calendar, documents, sharing, tags, trips, wallet_routes
 
 # ──────────────────────────────────────────────
 # Инициализация приложения
@@ -56,6 +56,7 @@ app.include_router(tags.router)
 app.include_router(documents.router)
 app.include_router(calendar.router)
 app.include_router(wallet_routes.router)
+app.include_router(sharing.router)
 
 # Статические файлы (фронтенд)
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
@@ -90,6 +91,9 @@ def on_startup():
         if "is_shared" not in trip_cols:
             conn.execute(text("ALTER TABLE trips ADD COLUMN is_shared BOOLEAN NOT NULL DEFAULT 0"))
             conn.commit()
+    # Создаём таблицу trip_shares если её нет (create_all с checkfirst)
+    from models import TripShare as _TripShare
+    _TripShare.__table__.create(bind=_engine, checkfirst=True)
     print("✓ Таблицы созданы / обновлены")
 
     # Авто-сид в dev-режиме

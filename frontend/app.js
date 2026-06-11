@@ -28,6 +28,8 @@ const State = {
   docFilters: { q: '', doc_type: '', trip_id: '', tag_id: '' },
   // Фильтры для поездок
   tripFilters: { q: '', type: '' },   // type: '' | 'personal' | 'shared'
+  // Ожидающий инвайт-токен (из start_param)
+  pendingInviteToken: null,
   // Выбранный месяц для календаря (YYYY-MM)
   calMonth: (() => {
     const d = new Date();
@@ -115,6 +117,22 @@ function el(tag, cls, html) {
  * Оборачивает карточку документа в контейнер со свайп-удалением влево.
  * afterDelete() вызывается после успешного удаления.
  */
+// ── Хелперы доступа к поездкам/документам ──────────────────────────────────
+
+/** Роль текущего пользователя в поездке: 'owner' | 'editor' | 'reader' | null */
+function getTripRole(tripId) {
+  if (!tripId) return 'owner';
+  const trip = State.trips.find(t => t.id === tripId);
+  return trip?.access_role || 'owner';
+}
+
+/** Может ли текущий пользователь редактировать/удалять документ */
+function canModifyDoc(doc) {
+  if (doc.user_id === State.user?.id) return true;
+  const role = getTripRole(doc.trip_id);
+  return role === 'owner' || role === 'editor';
+}
+
 function wrapSwipeDelete(card, doc, afterDelete) {
   const wrap = el('div', 'swipe-wrap');
 
@@ -1245,8 +1263,8 @@ function applyTripFilters(listEl) {
 
   let trips = State.trips.slice();
 
-  if (type === 'personal') trips = trips.filter(t => !t.is_shared);
-  if (type === 'shared')   trips = trips.filter(t => t.is_shared);
+  if (type === 'personal') trips = trips.filter(t => (t.access_role || 'owner') === 'owner');
+  if (type === 'shared')   trips = trips.filter(t => (t.access_role || 'owner') !== 'owner');
 
   if (q) {
     trips = trips.filter(t =>
@@ -1279,9 +1297,24 @@ function applyTripFilters(listEl) {
     const datesStr = [trip.start_date, trip.end_date]
       .filter(Boolean).map(formatDateShort).join(' — ') || 'Даты не указаны';
 
+    const role = trip.access_role || 'owner';
+    const roleLabel = role === 'editor' ? 'редактор' : role === 'reader' ? 'читатель' : null;
+
     card.innerHTML = `
       <div class="trip-card-header">
         <div class="trip-card-title">${escHtml(trip.title)}</div>
+        <div class="trip-card-header-actions">
+          ${roleLabel ? `<span class="trip-role-badge">${roleLabel}</span>` : ''}
+          ${role === 'owner' ? `<button class="trip-share-btn" title="Поделиться">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <circle cx="18" cy="5" r="3" stroke="currentColor" stroke-width="2"/>
+              <circle cx="6" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+              <circle cx="18" cy="19" r="3" stroke="currentColor" stroke-width="2"/>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" stroke="currentColor" stroke-width="2"/>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>` : ''}
+        </div>
       </div>
       <div class="trip-card-meta">
         <span class="trip-meta-chip">📅 ${escHtml(datesStr)}</span>
@@ -1290,10 +1323,16 @@ function applyTripFilters(listEl) {
           ${escHtml(addLocationFlags(trip.locations))}
         </span>` : ''}
         ${docCount ? `<span class="trip-meta-chip">📄 ${docCount} доку${docCount === 1 ? 'мент' : 'мента'}</span>` : ''}
+        ${role !== 'owner' ? `<span class="trip-meta-chip">👥 ${escHtml(trip.user_id !== State.user?.id ? 'Совместная' : 'Совместная')}</span>` : ''}
       </div>
       ${trip.note ? `<div class="trip-card-note">${escHtml(trip.note)}</div>` : ''}
     `;
     card.onclick = () => openTripDetail(trip);
+    // Кнопка «Поделиться» — отдельный обработчик, не открывает детали
+    const shareBtn = card.querySelector('.trip-share-btn');
+    if (shareBtn) {
+      shareBtn.onclick = (e) => { e.stopPropagation(); openShareModal(trip); };
+    }
     listEl.appendChild(card);
   });
 }
@@ -1674,6 +1713,208 @@ function openTripDetail(trip) {
   });
 }
 
+// ── ШЕРИНГ ПОЕЗДОК ──────────────────────────────────────────────────────────
+
+async function openShareModal(trip) {
+  Modal.open(sheet => {
+    sheet.classList.add('modal-full');
+    sheet.appendChild(Modal.buildHeader(`👥 Доступ: ${escHtml(trip.title)}`));
+
+    const body = el('div', 'modal-body');
+    body.style.paddingTop = '8px';
+
+    // ── Список участников ──
+    const membersTitle = el('div', 'section-title', 'Участники');
+    body.appendChild(membersTitle);
+
+    const membersList = el('div', 'share-members-list');
+    body.appendChild(membersList);
+
+    const loadMembers = async () => {
+      membersList.innerHTML = '<div style="color:var(--text-hint);font-size:13px;padding:8px 0">Загрузка...</div>';
+      try {
+        const members = await API.get(`/api/trips/${trip.id}/members`);
+        membersList.innerHTML = '';
+        const accepted = members.filter(m => m.accepted);
+        const pending  = members.filter(m => !m.accepted);
+
+        if (!accepted.length && !pending.length) {
+          membersList.innerHTML = '<div style="color:var(--text-hint);font-size:13px;padding:8px 0">Нет участников</div>';
+        }
+
+        accepted.forEach(m => {
+          const row = el('div', 'share-member-row');
+          row.innerHTML = `
+            <div class="share-member-info">
+              <span class="share-member-name">${escHtml(m.member_name || m.member_username || 'Пользователь')}</span>
+              ${m.member_username ? `<span class="share-member-username">@${escHtml(m.member_username)}</span>` : ''}
+            </div>`;
+          const roleSelect = el('select', 'select-card share-role-select');
+          roleSelect.innerHTML = `<option value="reader" ${m.role==='reader'?'selected':''}>Читатель</option>
+                                  <option value="editor" ${m.role==='editor'?'selected':''}>Редактор</option>`;
+          roleSelect.onchange = async () => {
+            try {
+              await API.patch(`/api/trips/${trip.id}/members/${m.share_id}`, { role: roleSelect.value });
+              showToast('Роль обновлена');
+            } catch (e) { showToast('Ошибка: ' + e.message); }
+          };
+          const removeBtn = el('button', 'share-member-remove', '');
+          removeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>`;
+          removeBtn.onclick = async () => {
+            try {
+              await API.delete(`/api/trips/${trip.id}/members/${m.share_id}`);
+              await loadAllData();
+              showToast('Участник удалён');
+              loadMembers();
+            } catch (e) { showToast('Ошибка: ' + e.message); }
+          };
+          row.appendChild(roleSelect);
+          row.appendChild(removeBtn);
+          membersList.appendChild(row);
+        });
+
+        // Ожидающие инвайты
+        pending.forEach(m => {
+          const row = el('div', 'share-member-row share-member-pending');
+          row.innerHTML = `
+            <div class="share-member-info">
+              <span class="share-member-name">Ожидание принятия</span>
+              <span class="share-member-username">${m.role === 'editor' ? 'Редактор' : 'Читатель'}</span>
+            </div>`;
+          const copyBtn = el('button', 'btn btn-secondary', '');
+          copyBtn.style.cssText = 'font-size:11px;padding:4px 8px;gap:4px';
+          copyBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" stroke-width="2"/></svg> Скопировать`;
+          const removeBtn = el('button', 'share-member-remove', '');
+          removeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+          // Получаем ссылку заново
+          copyBtn.onclick = async () => {
+            try {
+              const res = await API.post(`/api/trips/${trip.id}/invites`, { role: m.role });
+              // удаляем старый pending
+              await API.delete(`/api/trips/${trip.id}/members/${m.share_id}`);
+              if (res.link) {
+                navigator.clipboard?.writeText(res.link).catch(() => {});
+                showToast('Ссылка скопирована');
+              } else {
+                showToast('Ссылка создана (бот не настроен)');
+              }
+              loadMembers();
+            } catch (e) { showToast('Ошибка: ' + e.message); }
+          };
+          removeBtn.onclick = async () => {
+            try {
+              await API.delete(`/api/trips/${trip.id}/members/${m.share_id}`);
+              showToast('Инвайт отозван');
+              loadMembers();
+            } catch (e) { showToast('Ошибка: ' + e.message); }
+          };
+          row.appendChild(copyBtn);
+          row.appendChild(removeBtn);
+          membersList.appendChild(row);
+        });
+      } catch (e) {
+        membersList.innerHTML = `<div style="color:var(--text-hint);font-size:13px">${e.message}</div>`;
+      }
+    };
+    loadMembers();
+
+    // ── Создать новый инвайт ──
+    body.appendChild(el('div', 'doc-card-divider', ''));
+
+    const inviteTitle = el('div', 'section-title', 'Пригласить');
+    body.appendChild(inviteTitle);
+
+    const roleRow = el('div', 'share-invite-row');
+    const roleLabel = el('span', 'share-invite-label', 'Роль');
+    const roleSelect = el('select', 'select-card');
+    roleSelect.innerHTML = `<option value="reader">Читатель — только просмотр</option>
+                            <option value="editor">Редактор — добавление и изменение</option>`;
+    roleRow.appendChild(roleLabel);
+    roleRow.appendChild(roleSelect);
+    body.appendChild(roleRow);
+
+    const createBtn = el('button', 'btn btn-primary', '');
+    createBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Создать ссылку`;
+    createBtn.style.cssText = 'width:100%;margin-top:8px;justify-content:center';
+    createBtn.onclick = async () => {
+      try {
+        const res = await API.post(`/api/trips/${trip.id}/invites`, { role: roleSelect.value });
+        if (res.link) {
+          navigator.clipboard?.writeText(res.link).catch(() => {});
+          showToast('Ссылка скопирована в буфер');
+        } else {
+          showToast('Инвайт создан (настройте TELEGRAM_BOT_USERNAME для ссылки)');
+        }
+        loadMembers();
+      } catch (e) { showToast('Ошибка: ' + e.message); }
+    };
+    body.appendChild(createBtn);
+
+    sheet.appendChild(body);
+  }, { full: true });
+}
+
+async function handleInvite(token) {
+  let info;
+  try {
+    info = await API.get(`/api/invites/${token}`);
+  } catch (e) {
+    const msg = e.message?.includes('410') ? 'Эта ссылка уже была использована' : 'Инвайт не найден или истёк';
+    showToast(msg);
+    return;
+  }
+
+  const roleLabel = info.role === 'editor' ? 'редактора' : 'читателя';
+  Modal.open(sheet => {
+    sheet.appendChild(Modal.buildHeader('Приглашение в поездку'));
+    const body = el('div', 'modal-body');
+    body.style.paddingTop = '16px';
+    body.innerHTML = `
+      <div style="text-align:center;padding:0 8px 16px">
+        <div style="font-size:32px;margin-bottom:12px">✈️</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px">${escHtml(info.trip_title)}</div>
+        <div style="font-size:14px;color:var(--text-hint);margin-bottom:4px">
+          ${escHtml(info.owner_name || 'Пользователь')} приглашает вас как <strong>${roleLabel}</strong>
+        </div>
+        <div style="font-size:12px;color:var(--text-hint);margin-top:4px">
+          ${info.role === 'reader'
+            ? 'Только просмотр документов'
+            : 'Добавление и редактирование документов'}
+        </div>
+      </div>`;
+
+    const acceptBtn = el('button', 'btn btn-primary', 'Принять приглашение');
+    acceptBtn.style.cssText = 'width:100%;margin-bottom:8px;justify-content:center';
+    acceptBtn.onclick = async () => {
+      try {
+        acceptBtn.disabled = true;
+        acceptBtn.textContent = 'Подключение...';
+        const res = await API.post(`/api/invites/${token}/accept`, {});
+        await loadAllData();
+        State.loaded = true;
+        Modal.close();
+        App.navigate('trips', true);
+        showToast(`Вы теперь ${roleLabel} в поездке «${escHtml(info.trip_title)}»`);
+      } catch (e) {
+        acceptBtn.disabled = false;
+        acceptBtn.textContent = 'Принять приглашение';
+        showToast('Ошибка: ' + e.message);
+      }
+    };
+
+    const declineBtn = el('button', 'btn btn-secondary', 'Отклонить');
+    declineBtn.style.cssText = 'width:100%;justify-content:center';
+    declineBtn.onclick = () => Modal.close();
+
+    body.appendChild(acceptBtn);
+    body.appendChild(declineBtn);
+    sheet.appendChild(body);
+  }, { full: false });
+}
+
 // ── ДОКУМЕНТЫ ──
 
 function buildDocMiniCard(doc, showAllFields = false) {
@@ -1691,11 +1932,14 @@ function buildDocMiniCard(doc, showAllFields = false) {
   const fieldRefs = []; // { key, item, valueEl }
   let outsideEditHandler = null;
 
+  const _canEdit = canModifyDoc(doc);
+
   const editBtn = el('button', 'doc-card-edit-btn', 'Редактировать');
   editBtn.onclick = (e) => {
     e.stopPropagation();
     isEditMode ? saveAllEdits() : enterEditMode();
   };
+  if (!_canEdit) editBtn.style.display = 'none';
 
   const header = el('div', 'doc-card-header');
   header.innerHTML = `
@@ -2048,7 +2292,7 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   walletBtn.onclick = (e) => { e.stopPropagation(); openProModal(); };
 
   actions.appendChild(openFileBtn);
-  actions.appendChild(replaceBtn);
+  if (canModifyDoc(doc)) actions.appendChild(replaceBtn);
   actions.appendChild(walletBtn);
   container.appendChild(actions);
 
@@ -2352,7 +2596,12 @@ async function applyDocFilters(listEl) {
 
     docs.forEach(doc => {
       const card = buildDocMiniCard(doc);
-      listEl.appendChild(wrapSwipeDelete(card, doc, () => applyDocFilters()));
+      if (canModifyDoc(doc)) {
+        listEl.appendChild(wrapSwipeDelete(card, doc, () => applyDocFilters()));
+      } else {
+        card.style.margin = '10px var(--gap) 0';
+        listEl.appendChild(card);
+      }
     });
   } catch (e) {
     listEl.innerHTML = `<div class="empty-state"><p>Ошибка загрузки: ${e.message}</p></div>`;
@@ -3692,6 +3941,12 @@ const App = {
     tgInit();
     State.user = TG?.initDataUnsafe?.user || { id: 1, first_name: 'Packfolio' };
 
+    // Проверяем start_param — может быть инвайт-токен
+    const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param || '';
+    if (startParam.startsWith('inv_')) {
+      State.pendingInviteToken = startParam.slice(4);
+    }
+
     const TABS = ['trips', 'docs', 'calendar', 'profile'];
     const initialTab = TABS.includes(location.hash.replace('#', '')) ? location.hash.replace('#', '') : 'trips';
     this.navigate(initialTab);
@@ -3726,6 +3981,13 @@ const App = {
     State.loaded = true;
     // Перерисовываем текущую вкладку с загруженными данными
     this.navigate(State.currentTab, true);
+
+    // Обрабатываем ожидающий инвайт
+    if (State.pendingInviteToken) {
+      const token = State.pendingInviteToken;
+      State.pendingInviteToken = null;
+      handleInvite(token);
+    }
   },
 
   navigate(tab, fromHash = false) {

@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from auth import get_current_user_id, decode_token, bearer_scheme, ENV
-from models import Document, DocumentTag, Tag, WidgetData, get_db
+from models import Document, DocumentTag, Tag, TripShare, WidgetData, get_db
+from access import get_trip_role
 from parser import parse_document
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
@@ -371,7 +372,19 @@ def list_documents(
     user_id: int     = Depends(get_current_user_id),
     db:      Session = Depends(get_db),
 ):
-    query = db.query(Document).filter(Document.user_id == user_id)
+    from sqlalchemy import or_
+    # Поездки к которым у пользователя есть доступ как участник
+    shared_trip_ids = [
+        s.trip_id for s in db.query(TripShare).filter(
+            TripShare.member_id == user_id,
+            TripShare.accepted == True,
+        ).all()
+    ]
+    if shared_trip_ids:
+        base_filter = or_(Document.user_id == user_id, Document.trip_id.in_(shared_trip_ids))
+    else:
+        base_filter = Document.user_id == user_id
+    query = db.query(Document).filter(base_filter)
 
     if trip_id is not None:
         query = query.filter(Document.trip_id == trip_id)
@@ -409,9 +422,12 @@ def get_document(
     user_id: int     = Depends(get_current_user_id),
     db:      Session = Depends(get_db),
 ):
-    doc = db.query(Document).filter(Document.id == doc_id, Document.user_id == user_id).first()
+    doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Документ не найден")
+    if doc.user_id != user_id:
+        if not doc.trip_id or not get_trip_role(doc.trip_id, user_id, db):
+            raise HTTPException(status_code=403, detail="Нет доступа")
     return doc_to_dict(doc)
 
 
@@ -429,9 +445,13 @@ def update_document(
     user_id: int     = Depends(get_current_user_id),
     db:      Session = Depends(get_db),
 ):
-    doc = db.query(Document).filter(Document.id == doc_id, Document.user_id == user_id).first()
+    doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Документ не найден")
+    if doc.user_id != user_id:
+        role = get_trip_role(doc.trip_id, user_id, db) if doc.trip_id else None
+        if role not in ("owner", "editor"):
+            raise HTTPException(status_code=403, detail="Нет прав для изменения документа")
 
     if body.title    is not None: doc.title    = body.title
     if body.doc_type is not None: doc.doc_type = body.doc_type
@@ -453,9 +473,13 @@ def patch_widget(
     db:      Session = Depends(get_db),
 ):
     """Патч произвольных полей виджета (пользователь редактирует поля)."""
-    doc = db.query(Document).filter(Document.id == doc_id, Document.user_id == user_id).first()
+    doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Документ не найден")
+    if doc.user_id != user_id:
+        role = get_trip_role(doc.trip_id, user_id, db) if doc.trip_id else None
+        if role not in ("owner", "editor"):
+            raise HTTPException(status_code=403, detail="Нет прав для изменения документа")
 
     wd = doc.widget_data
     if not wd:
@@ -489,9 +513,13 @@ async def replace_file(
     db:      Session = Depends(get_db),
 ):
     """Заменяет файл документа и перезапускает парсинг."""
-    doc = db.query(Document).filter(Document.id == doc_id, Document.user_id == user_id).first()
+    doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Документ не найден")
+    if doc.user_id != user_id:
+        role = get_trip_role(doc.trip_id, user_id, db) if doc.trip_id else None
+        if role not in ("owner", "editor"):
+            raise HTTPException(status_code=403, detail="Нет прав для замены файла")
 
     mime_resolved = _resolve_mime(file)
     ext = os.path.splitext(file.filename or "")[1].lower()
@@ -610,9 +638,13 @@ def delete_document(
     user_id: int     = Depends(get_current_user_id),
     db:      Session = Depends(get_db),
 ):
-    doc = db.query(Document).filter(Document.id == doc_id, Document.user_id == user_id).first()
+    doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Документ не найден")
+    if doc.user_id != user_id:
+        role = get_trip_role(doc.trip_id, user_id, db) if doc.trip_id else None
+        if role not in ("owner", "editor"):
+            raise HTTPException(status_code=403, detail="Нет прав для удаления документа")
 
     if doc.file_path and os.path.exists(doc.file_path):
         os.remove(doc.file_path)

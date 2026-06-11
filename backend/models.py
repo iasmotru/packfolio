@@ -146,6 +146,23 @@ class DocumentTag(Base):
     tag      = relationship("Tag")
 
 
+class TripShare(Base):
+    __tablename__ = "trip_shares"
+
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    trip_id      = Column(Integer, ForeignKey("trips.id", ondelete="CASCADE"), nullable=False)
+    owner_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
+    member_id    = Column(Integer, ForeignKey("users.id"), nullable=True)   # NULL пока не принято
+    role         = Column(String(16), nullable=False, default="reader")     # "reader" | "editor"
+    invite_token = Column(String(64), unique=True, nullable=False)
+    accepted     = Column(Boolean, default=False, nullable=False, server_default="0")
+    created_at   = Column(DateTime, default=datetime.utcnow)
+
+    trip   = relationship("Trip",  foreign_keys=[trip_id])
+    owner  = relationship("User",  foreign_keys=[owner_id])
+    member = relationship("User",  foreign_keys=[member_id])
+
+
 # ──────────────────────────────────────────────
 # DI helper
 # ──────────────────────────────────────────────

@@ -8,8 +8,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from sqlalchemy import or_
 from auth import get_current_user_id
-from models import Document, WidgetData, Trip, get_db
+from models import Document, TripShare, WidgetData, Trip, get_db
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
@@ -148,8 +149,22 @@ def get_calendar(
     Возвращает события за указанный месяц (или за всё время).
     Каждое событие: { id, kind, title, subtitle, date, end_date, doc_type, doc_id, trip_id }
     """
-    docs  = db.query(Document).filter(Document.user_id == user_id).all()
-    trips = db.query(Trip).filter(Trip.user_id == user_id).all()
+    # Расшаренные поездки (принятые)
+    shared_trip_ids = [
+        s.trip_id for s in db.query(TripShare).filter(
+            TripShare.member_id == user_id, TripShare.accepted == True
+        ).all()
+    ]
+    if shared_trip_ids:
+        trips = db.query(Trip).filter(
+            or_(Trip.user_id == user_id, Trip.id.in_(shared_trip_ids))
+        ).all()
+        docs = db.query(Document).filter(
+            or_(Document.user_id == user_id, Document.trip_id.in_(shared_trip_ids))
+        ).all()
+    else:
+        docs  = db.query(Document).filter(Document.user_id == user_id).all()
+        trips = db.query(Trip).filter(Trip.user_id == user_id).all()
 
     events = docs_to_events(docs, trips)
 
