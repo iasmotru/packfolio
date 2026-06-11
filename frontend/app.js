@@ -2507,6 +2507,7 @@ function renderTagsEditor(container, currentTags, onUpdate) {
     autocomplete.appendChild(input);
 
     let dropdown = null;
+    let _hiddenByTagEditor = false;
 
     const showDropdown = (items) => {
       if (dropdown) dropdown.remove();
@@ -2515,6 +2516,7 @@ function renderTagsEditor(container, currentTags, onUpdate) {
       items.forEach(item => {
         const row = el('div', `tag-dropdown-item${item.isCreate ? ' create' : ''}`,
           item.isCreate ? `+ Создать тег «${escHtml(item.name)}»` : `${item.kind === 'tripType' ? '🗺 ' : '🏷 '}${escHtml(item.name)}`);
+        row.onmousedown = e => e.preventDefault(); // не даём blur сработать раньше click
         row.onclick = async () => {
           let tag = item;
           if (item.isCreate) {
@@ -2528,8 +2530,7 @@ function renderTagsEditor(container, currentTags, onUpdate) {
             onUpdate(selectedTags.map(t => t.id));
           }
           input.value = '';
-          dropdown.remove();
-          dropdown = null;
+          if (dropdown) { dropdown.remove(); dropdown = null; }
           render();
         };
         dropdown.appendChild(row);
@@ -2537,16 +2538,45 @@ function renderTagsEditor(container, currentTags, onUpdate) {
       autocomplete.appendChild(dropdown);
     };
 
-    input.oninput = () => {
-      const q = input.value.trim().toLowerCase();
-      if (!q) { if (dropdown) { dropdown.remove(); dropdown = null; } return; }
-      const filtered = State.tags
-        .filter(t => t.name.toLowerCase().includes(q) && !selectedTags.find(s => s.id === t.id))
-        .slice(0, 6);
-      const items = [...filtered];
+    const buildDropdownItems = (q) => {
+      const available = State.tags.filter(t => !selectedTags.find(s => s.id === t.id));
+      if (!q) return available.slice(0, 8);
+      const filtered = available.filter(t => t.name.toLowerCase().includes(q)).slice(0, 6);
       const exact = State.tags.find(t => t.name.toLowerCase() === q);
-      if (!exact) items.push({ name: input.value.trim(), isCreate: true });
-      showDropdown(items);
+      if (!exact && q) filtered.push({ name: input.value.trim(), isCreate: true });
+      return filtered;
+    };
+
+    input.addEventListener('focus', () => {
+      // Показываем все доступные теги сразу при фокусе
+      showDropdown(buildDropdownItems(input.value.trim().toLowerCase()));
+      // Скрываем нав + FAB, если они ещё не скрыты (edit mode)
+      const bottomNav = document.querySelector('.bottom-nav-wrap');
+      const fab = document.querySelector('#fab');
+      if (bottomNav && bottomNav.style.display !== 'none') {
+        bottomNav.style.display = 'none';
+        if (fab) fab.style.display = 'none';
+        _hiddenByTagEditor = true;
+      }
+    });
+
+    input.addEventListener('blur', () => {
+      // Восстанавливаем нав + FAB только если мы сами их скрывали
+      if (_hiddenByTagEditor) {
+        const bottomNav = document.querySelector('.bottom-nav-wrap');
+        const fab = document.querySelector('#fab');
+        if (bottomNav) bottomNav.style.display = '';
+        if (fab) fab.style.display = '';
+        _hiddenByTagEditor = false;
+      }
+      // Закрываем дропдаун с задержкой, чтобы успел сработать onclick на пункте
+      setTimeout(() => {
+        if (dropdown) { dropdown.remove(); dropdown = null; }
+      }, 150);
+    });
+
+    input.oninput = () => {
+      showDropdown(buildDropdownItems(input.value.trim().toLowerCase()));
     };
 
     container.appendChild(autocomplete);
