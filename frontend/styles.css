@@ -698,6 +698,11 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 
 .swipe-delete-action svg { flex-shrink: 0; }
 
+/* Скрываем кнопку удаления во время анимации переворота карточки */
+.swipe-wrap.is-flipping .swipe-delete-action {
+  visibility: hidden;
+}
+
 .doc-card {
   background: var(--bg-card);
   border-radius: var(--radius-lg);

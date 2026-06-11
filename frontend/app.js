@@ -154,6 +154,8 @@ function wrapSwipeDelete(card, doc, afterDelete) {
   };
 
   card.addEventListener('touchstart', e => {
+    // Не свайпаем когда карточка перевёрнута или идёт анимация
+    if (card.classList.contains('is-flipped') || wrap.classList.contains('is-flipping')) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     baseX  = revealed ? -REVEAL : 0;
@@ -1950,6 +1952,17 @@ function buildDocMiniCard(doc, showAllFields = false) {
   let isFlipped = false;
   function doFlip() {
     isFlipped = !isFlipped;
+
+    // Сбрасываем swipe-offset чтобы карточка не «летела» из сдвинутой позиции
+    card.style.transition = 'none';
+    card.style.transform = '';
+    void card.offsetWidth; // force reflow
+
+    // Ставим классы состояния
+    card.classList.toggle('is-flipped', isFlipped);
+    const swipeWrap = card.closest('.swipe-wrap');
+    if (swipeWrap) swipeWrap.classList.add('is-flipping');
+
     if (isFlipped) {
       // Lock card height to the front face height before flipping
       const h = card.offsetHeight;
@@ -1972,6 +1985,11 @@ function buildDocMiniCard(doc, showAllFields = false) {
       }
       card.style.transition = 'transform 0.13s ease-out';
       card.style.transform = 'scaleX(1)';
+      // Снимаем is-flipping только когда обратная анимация (scaleX 0→1) тоже завершилась
+      card.addEventListener('transitionend', function handler2() {
+        card.removeEventListener('transitionend', handler2);
+        if (swipeWrap) swipeWrap.classList.remove('is-flipping');
+      }, { once: true });
     }, { once: true });
   }
 
