@@ -3281,7 +3281,7 @@ const App = {
     tgInit();
     State.user = TG?.initDataUnsafe?.user || { id: 1, first_name: 'Packfolio' };
 
-    const TABS = ['home', 'trips', 'docs', 'calendar'];
+    const TABS = ['trips', 'docs', 'calendar'];
     const initialTab = TABS.includes(location.hash.replace('#', '')) ? location.hash.replace('#', '') : 'trips';
     this.navigate(initialTab);
 
@@ -3327,9 +3327,7 @@ const App = {
     updateNavIndicator(tab);
 
     try {
-      if (tab === 'home') {
-        renderHomePage();
-      } else if (tab === 'trips') {
+      if (tab === 'trips') {
         renderTripsPage();
       } else if (tab === 'docs') {
         renderDocsPage();
@@ -3388,10 +3386,10 @@ function updateNavIndicator(tab) {
   const indicator = qs('#nav-indicator');
   const nav = qs('.bottom-nav');
   if (!indicator || !nav) return;
-  const tabs = ['home', 'trips', 'docs', 'calendar'];
+  const tabs = ['trips', 'docs', 'calendar'];
   const idx = tabs.indexOf(tab);
   if (idx === -1) return;
-  const w = nav.offsetWidth / 4;
+  const w = nav.offsetWidth / 3;
   indicator.style.width = w + 'px';
   indicator.style.left  = (idx * w) + 'px';
 }
