@@ -3300,9 +3300,23 @@ document.addEventListener('DOMContentLoaded', () => {
 // ──────────────────────────────────────────────
 // Keyboard / visualViewport fix (iOS Telegram)
 // ──────────────────────────────────────────────
+
+// Находит ближайший предок, у которого реально есть прокрутка
+function findScrollableParent(el) {
+  let node = el.parentElement;
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    if (['auto', 'scroll'].includes(style.overflowY) && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
 function setupKeyboardAdjust() {
-  // Скроллим активный инпут в зону видимости при фокусе
-  // Пробуем дважды: 350ms и 700ms — клавиатура iOS анимируется ~500ms
+  // Скроллим активный инпут в зону видимости при фокусе.
+  // Пробуем дважды: 350ms и 700ms — клавиатура iOS анимируется ~500ms.
   document.addEventListener('focusin', (e) => {
     if (!e.target.matches('input, textarea, select')) return;
     [350, 700].forEach(delay => {
@@ -3312,11 +3326,7 @@ function setupKeyboardAdjust() {
         const rect = target.getBoundingClientRect();
         const visibleBottom = vv ? vv.height : window.innerHeight;
         if (rect.bottom > visibleBottom - 16) {
-          // Скроллим ближайший прокручиваемый контейнер
-          const scrollEl =
-            target.closest('.modal-body') ||
-            target.closest('.modal-sheet') ||
-            target.closest('.page');
+          const scrollEl = findScrollableParent(target);
           if (scrollEl) {
             scrollEl.scrollTop += rect.bottom - visibleBottom + 80;
           } else {
@@ -3330,6 +3340,8 @@ function setupKeyboardAdjust() {
   // Уменьшаем высоту modal-overlay И modal-sheet до реальной видимой области.
   // dvh не пересчитывается в iOS Telegram WKWebView при появлении клавиатуры,
   // поэтому задаём max-height шиту вручную через JS.
+  // modal-full (архив) не трогаем — он занимает весь экран и имеет
+  // собственный скроллируемый список; изменение max-height ломает его layout.
   if (!window.visualViewport) return;
 
   const applyKeyboard = () => {
@@ -3341,7 +3353,8 @@ function setupKeyboardAdjust() {
       overlay.style.top     = offsetTop + 'px';
       overlay.style.bottom  = '';
     });
-    document.querySelectorAll('.modal-sheet').forEach(sheet => {
+    // Только не-полноэкранные шиты (trip form, doc form и т.д.)
+    document.querySelectorAll('.modal-sheet:not(.modal-full)').forEach(sheet => {
       sheet.style.maxHeight = Math.round(visibleH * 0.95) + 'px';
     });
   };
@@ -3351,7 +3364,7 @@ function setupKeyboardAdjust() {
       overlay.style.height = '';
       overlay.style.top    = '';
     });
-    document.querySelectorAll('.modal-sheet').forEach(sheet => {
+    document.querySelectorAll('.modal-sheet:not(.modal-full)').forEach(sheet => {
       sheet.style.maxHeight = '';
     });
   };
