@@ -3139,7 +3139,7 @@ function renderCalendarTripFilters(container) {
     const data = await API.get(`/api/calendar?month=${State.calMonth}`).catch(() => ({ events: [] }));
     State.calEvents = data?.events || [];
     const c = qs('#page-content');
-    c.innerHTML = '';
+    c.innerHTML = '';          // очищаем только после получения данных
     renderCalendarTripFilters(c);
     renderCalendarGrid(c);
     renderEventsList(c);
@@ -3380,11 +3380,12 @@ async function shiftMonth(delta, container) {
   State.calMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   State.calSelectedDay = null;
   State.calActiveTripId = null;
-  container.innerHTML = '';
+  // Сначала получаем данные, потом обновляем DOM — без мигания пустого экрана
   try {
     const data = await API.get(`/api/calendar?month=${State.calMonth}`);
     State.calEvents = data.events || [];
-  } catch (_) {}
+  } catch (_) { State.calEvents = []; }
+  container.innerHTML = '';
   renderCalendarTripFilters(container);
   renderCalendarGrid(container);
   renderEventsList(container);
