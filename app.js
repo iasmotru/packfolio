@@ -153,6 +153,8 @@ function wrapSwipeDelete(card, doc, afterDelete) {
     revealed = x < 0;
     // Кнопка видна только когда карточка сдвинута влево
     deleteAction.style.visibility = revealed ? 'visible' : 'hidden';
+    // Класс для блокировки переворота пока кнопка открыта
+    card.classList.toggle('swipe-revealed', revealed);
   };
 
   card.addEventListener('touchstart', e => {
@@ -1955,6 +1957,9 @@ function buildDocMiniCard(doc, showAllFields = false) {
   // ─── Flip logic ───────────────────────────────────────────────────────────
   let isFlipped = false;
   function doFlip() {
+    // Не переворачиваем пока видна кнопка удаления
+    if (card.classList.contains('swipe-revealed')) return;
+
     isFlipped = !isFlipped;
 
     // Сбрасываем swipe-offset чтобы карточка не «летела» из сдвинутой позиции
