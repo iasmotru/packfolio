@@ -210,10 +210,10 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   line-height: 1;
 }
 
-/* Активный таб — акцент, неактивные полностью непрозрачны */
-.nav-btn.active { color: var(--accent); }
+/* Активный таб — белый поверх пилла, неактивные в цвете текста */
+.nav-btn { transition: color .2s; position: relative; z-index: 1; }
+.nav-btn.active { color: #fff; }
 .nav-btn:not(.active) { color: var(--text); }
-.nav-btn { transition: color .2s; }
 .nav-btn:active { opacity: .5; }
 
 /* ──────────────────────────────────────────────
