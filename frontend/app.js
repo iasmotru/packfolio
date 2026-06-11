@@ -26,6 +26,8 @@ const State = {
   documents: [],
   // Фильтры для документов
   docFilters: { q: '', doc_type: '', trip_id: '', tag_id: '' },
+  // Фильтры для поездок
+  tripFilters: { q: '', type: '' },   // type: '' | 'personal' | 'shared'
   // Выбранный месяц для календаря (YYYY-MM)
   calMonth: (() => {
     const d = new Date();
@@ -1044,6 +1046,12 @@ function renderHomePage() {
 
 // ── ПОЕЗДКИ ──
 
+const TRIP_FILTER_TYPES = [
+  { val: '',         label: 'Все' },
+  { val: 'personal', label: 'Личные' },
+  { val: 'shared',   label: 'Совместные' },
+];
+
 function renderTripsPage() {
   const c = qs('#page-content');
   c.innerHTML = '';
@@ -1057,23 +1065,85 @@ function renderTripsPage() {
     return;
   }
 
-  if (!State.trips.length) {
-    c.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-            <path d="M22 16.5H2M6.5 7L2 16.5M17.5 7L22 16.5M6.5 7H17.5M6.5 7L12 3.5L17.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <strong>Нет поездок</strong>
-        <p>Нажмите «+», чтобы добавить первую поездку</p>
-      </div>`;
+  if (!State.loaded) {
+    c.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
     return;
   }
 
-  const list = el('div', 'trips-list');
+  // ── Sticky-контейнер: поиск + фильтры ──
+  const stickyControls = el('div', 'docs-sticky-controls');
+  const controlsCol = el('div', 'docs-controls-col');
 
-  State.trips.forEach(trip => {
+  const searchRow = el('div', 'docs-search-row');
+  const searchInput = el('input', 'search-input');
+  searchInput.placeholder = 'Поиск поездок...';
+  searchInput.value = State.tripFilters.q;
+  searchInput.oninput = debounce(() => {
+    State.tripFilters.q = searchInput.value;
+    applyTripFilters();
+  }, 300);
+  searchRow.appendChild(searchInput);
+  controlsCol.appendChild(searchRow);
+
+  const chips = el('div', 'filter-chips');
+  TRIP_FILTER_TYPES.forEach(({ val, label }) => {
+    const active = State.tripFilters.type === val;
+    const chip = el('button', `chip${active ? ' active' : ''}`, label);
+    chip.onclick = () => {
+      State.tripFilters.type = val;
+      renderTripsPage();
+    };
+    chips.appendChild(chip);
+  });
+  controlsCol.appendChild(chips);
+  stickyControls.appendChild(controlsCol);
+  c.appendChild(stickyControls);
+
+  // ── Список поездок ──
+  const list = el('div', 'trips-list');
+  list.id = 'trips-list';
+  c.appendChild(list);
+
+  applyTripFilters(list);
+}
+
+function applyTripFilters(listEl) {
+  listEl = listEl || qs('#trips-list');
+  if (!listEl) return;
+
+  const q    = (State.tripFilters.q || '').toLowerCase().trim();
+  const type = State.tripFilters.type;
+
+  let trips = State.trips.slice();
+
+  if (type === 'personal') trips = trips.filter(t => !t.is_shared);
+  if (type === 'shared')   trips = trips.filter(t => t.is_shared);
+
+  if (q) {
+    trips = trips.filter(t =>
+      (t.title     || '').toLowerCase().includes(q) ||
+      (t.locations || '').toLowerCase().includes(q) ||
+      (t.note      || '').toLowerCase().includes(q)
+    );
+  }
+
+  listEl.innerHTML = '';
+
+  if (!trips.length) {
+    const empty = el('div', 'empty-state');
+    empty.innerHTML = `
+      <div class="empty-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+          <path d="M22 16.5H2M6.5 7L2 16.5M17.5 7L22 16.5M6.5 7H17.5M6.5 7L12 3.5L17.5 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <strong>${State.trips.length ? 'Ничего не найдено' : 'Нет поездок'}</strong>
+      <p>${State.trips.length ? 'Попробуйте изменить запрос или фильтр' : 'Нажмите «+», чтобы добавить первую поездку'}</p>`;
+    listEl.appendChild(empty);
+    return;
+  }
+
+  trips.forEach(trip => {
     const docCount = State.documents.filter(d => d.trip_id === trip.id).length;
     const card = el('div', 'trip-card');
 
@@ -1095,10 +1165,8 @@ function renderTripsPage() {
       ${trip.note ? `<div class="trip-card-note">${escHtml(trip.note)}</div>` : ''}
     `;
     card.onclick = () => openTripDetail(trip);
-    list.appendChild(card);
+    listEl.appendChild(card);
   });
-
-  c.appendChild(list);
 }
 
 // ── Location autocomplete (Nominatim / OpenStreetMap) ──

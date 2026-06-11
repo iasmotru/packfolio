@@ -79,6 +79,7 @@ class Trip(Base):
     start_date = Column(String(32),  nullable=True)   # ISO date string
     end_date   = Column(String(32),  nullable=True)
     note       = Column(Text,         nullable=True)
+    is_shared  = Column(Boolean, default=False, nullable=False, server_default="0")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user      = relationship("User",     back_populates="trips")

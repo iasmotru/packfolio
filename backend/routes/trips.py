@@ -25,6 +25,7 @@ class TripCreate(BaseModel):
     start_date: Optional[str] = None
     end_date:   Optional[str] = None
     note:       Optional[str] = None
+    is_shared:  bool = False
 
 
 class TripUpdate(BaseModel):
@@ -33,6 +34,7 @@ class TripUpdate(BaseModel):
     start_date: Optional[str] = None
     end_date:   Optional[str] = None
     note:       Optional[str] = None
+    is_shared:  Optional[bool] = None
 
 
 class TripOut(BaseModel):
@@ -43,6 +45,7 @@ class TripOut(BaseModel):
     start_date: Optional[str]
     end_date:   Optional[str]
     note:       Optional[str]
+    is_shared:  bool = False
     created_at: datetime
 
     class Config:
