@@ -446,39 +446,54 @@ def extract_hotel_data(text: str) -> Dict[str, Any]:
 def _extract_airline_itinerary(lines: list) -> Optional[Dict]:
     """
     Парсит маршрутную строку вида:
-      CITY FLIGHT_NO CL DATE HHMM STATUS ...
-      (AIRPORT) ... arrival date and time: DATE HHMM
-      ARRIVAL_CITY
-      (ARRIVAL_AIRPORT)
-    Используется для билетов без IATA-кодов в скобках (Pobeda, S7 и т.п.).
+      CITY [(AIRPORT NAME)] FLIGHT_NO CL DATE HHMM STATUS ...
+      arrival date and time: DATE HHMM
+      ARRIVAL_CITY [(ARRIVAL_AIRPORT)]
+    Поддерживает форматы Pobeda/S7 где аэропорты записаны как "MOSCOW (VNUKOVO A)".
     """
     for i, line in enumerate(lines):
+        # Расширенный паттерн: CITY с необязательным (AIRPORT NAME) перед кодом рейса
         m = re.search(
-            r'^([A-Z][A-Z ]{1,20})\s+([A-Z]{2})\s*(\d{3,4})\s+[A-Z]\s+'
+            r'^([A-Z][A-Z ]{1,30}?)\s*(?:\(([^)]*)\))?\s*([A-Z]{2})\s*(\d{3,4})\s+[A-Z]\s+'
             r'(\d{1,2}[A-Za-z]{3}\d{2,4})\s+(\d{4})\b',
             line.strip(),
         )
         if not m:
             continue
 
-        dep_city = m.group(1).strip().title()
-        flight_no = m.group(2) + m.group(3)
-        dep_date = normalize_date_str(m.group(4))
-        dep_time_raw = m.group(5)
+        dep_city_raw = m.group(1).strip()
+        dep_airport_name = m.group(2).strip() if m.group(2) else None
+        flight_no = m.group(3) + m.group(4)
+        dep_date = normalize_date_str(m.group(5))
+        dep_time_raw = m.group(6)
         dep_time = f"{dep_time_raw[:2]}:{dep_time_raw[2:]}"
+
+        # IATA вылета: из названия аэропорта в скобках (на той же строке)
+        dep_iata = _airport_name_to_iata(dep_airport_name) if dep_airport_name else None
 
         result: Dict[str, Any] = {
             'flight_no': flight_no,
-            'dep_city': dep_city,
+            'dep_city': dep_city_raw.title(),
             'dep_date': dep_date,
             'dep_time': dep_time,
+            'dep_iata': dep_iata,
             'arr_date': None,
             'arr_time': None,
             'arr_city': None,
+            'arr_iata': None,
         }
 
-        for j in range(i + 1, min(len(lines), i + 8)):
+        arr_city_candidate: Optional[str] = None  # временный кандидат города прилёта
+
+        for j in range(i + 1, min(len(lines), i + 10)):
             ln = lines[j].strip()
+
+            # Вариант Pobeda: строка "(AIRPORT_NAME) дата и время прибытия..."
+            # "(VNUKOVO A) arrival date and time: 25AUG26 1205" — это аэропорт вылета
+            if not result['dep_iata']:
+                dep_ap_line = re.match(r'^\(([^)]+)\)\s*(?:дата|arrival|прибытия)', ln, re.IGNORECASE)
+                if dep_ap_line:
+                    result['dep_iata'] = _airport_name_to_iata(dep_ap_line.group(1).strip())
 
             # Arrival datetime: "arrival date and time: DATE HHMM" / "прибытия: DATE HHMM"
             if not result['arr_date']:
@@ -490,9 +505,39 @@ def _extract_airline_itinerary(lines: list) -> Optional[Dict]:
                     result['arr_date'] = normalize_date_str(am.group(1))
                     result['arr_time'] = f"{am.group(2)[:2]}:{am.group(2)[2:]}"
 
-            # Arrival city: строка только из заглавных букв и пробелов (не заголовок)
-            if not result['arr_city'] and re.match(r'^[A-Z][A-Z ]+$', ln) and 3 < len(ln) < 40:
-                result['arr_city'] = ln.strip().title()
+            # Arrival city/airport — три варианта:
+            # A: "ISTANBUL (ISTANBUL AIRPORT)" всё на одной строке
+            # B: "ISTANBUL\n(ISTANBUL AIRPORT)" — город и аэропорт на разных строках
+            # C: просто "ISTANBUL" без аэропорта
+            if not result['arr_city']:
+                city_ap_m = re.match(r'^([A-Z][A-Z ]{2,30})\s*\(([^)]+)\)\s*$', ln)
+                if city_ap_m:
+                    # Вариант A
+                    result['arr_city'] = city_ap_m.group(1).strip().title()
+                    result['arr_iata'] = _airport_name_to_iata(city_ap_m.group(2).strip())
+                elif re.match(r'^[A-Z][A-Z ]+$', ln) and 3 < len(ln) < 40:
+                    # Потенциальный город — сохраняем как кандидат
+                    arr_city_candidate = ln.strip().title()
+                elif arr_city_candidate:
+                    # Предыдущая строка была городом — проверяем, не "(AIRPORT)" ли это
+                    ap_only_m = re.match(r'^\(([^)]+)\)\s*$', ln)
+                    if ap_only_m:
+                        # Вариант B
+                        result['arr_city'] = arr_city_candidate
+                        result['arr_iata'] = _airport_name_to_iata(ap_only_m.group(1).strip())
+                    else:
+                        # Вариант C — зафиксировали просто город без аэропорта
+                        result['arr_city'] = arr_city_candidate
+
+        # Если IATA всё ещё не найдены — пробуем строку расчёта тарифа
+        if not result['dep_iata'] or not result['arr_iata']:
+            fare_iata = _extract_fare_calc_iata(lines)
+            if fare_iata:
+                fc_dep, fc_arr = fare_iata
+                if not result['dep_iata']:
+                    result['dep_iata'] = fc_dep
+                if not result['arr_iata']:
+                    result['arr_iata'] = fc_arr
 
         return result
 
@@ -599,6 +644,133 @@ def _extract_flight_legs(lines: list, pnr: str = None) -> list:
             deduped.append(leg)
 
     return deduped
+
+
+# ──────────────────────────────────────────────
+# Маппинг названий аэропортов → IATA-коды
+# (для форматов, где нет явных IATA в скобках, e.g. Pobeda)
+# ──────────────────────────────────────────────
+
+AIRPORT_NAME_TO_IATA: Dict[str, str] = {
+    # Москва
+    "VNUKOVO": "VKO", "VNUKOVO A": "VKO", "VNUKOVO B": "VKO", "VNUKOVO C": "VKO",
+    "DOMODEDOVO": "DME",
+    "SHEREMETYEVO": "SVO", "SHEREMETYEVO B": "SVO", "SHEREMETYEVO C": "SVO",
+    "ZHUKOVSKY": "ZIA", "ZHUKOVSKIY": "ZIA",
+    # Санкт-Петербург
+    "PULKOVO": "LED",
+    # Турция
+    "ISTANBUL AIRPORT": "IST", "ISTANBUL NEW AIRPORT": "IST", "ISTANBUL": "IST",
+    "SABIHA GOKCEN": "SAW", "SABIHA GOKCHEN": "SAW",
+    "ANKARA ESENBOGA": "ESB", "ESENBOGA": "ESB",
+    "ANTALYA": "AYT",
+    "BODRUM MILAS": "BJV", "MILAS BODRUM": "BJV",
+    "IZMIR ADNAN MENDERES": "ADB", "ADNAN MENDERES": "ADB",
+    "TRABZON": "TZX",
+    "DALAMAN": "DLM",
+    # Германия
+    "FRANKFURT": "FRA", "FRANKFURT MAIN": "FRA", "FRANKFURT AM MAIN": "FRA",
+    "MUNICH": "MUC", "MÜNCHEN": "MUC", "MUNICH INTERNATIONAL": "MUC",
+    "BERLIN BRANDENBURG": "BER", "BERLIN": "BER", "BER": "BER",
+    "HAMBURG": "HAM",
+    "DUSSELDORF": "DUS", "DÜSSELDORF": "DUS",
+    "COLOGNE BONN": "CGN",
+    # Великобритания
+    "HEATHROW": "LHR", "LONDON HEATHROW": "LHR",
+    "GATWICK": "LGW", "LONDON GATWICK": "LGW",
+    "STANSTED": "STN", "LONDON STANSTED": "STN",
+    "LUTON": "LTN", "LONDON LUTON": "LTN",
+    "LONDON CITY": "LCY",
+    # ОАЭ
+    "DUBAI": "DXB", "DUBAI INTERNATIONAL": "DXB",
+    "ABU DHABI": "AUH",
+    # Европа
+    "PARIS CDG": "CDG", "CHARLES DE GAULLE": "CDG", "ROISSY": "CDG",
+    "PARIS ORLY": "ORY", "ORLY": "ORY",
+    "AMSTERDAM": "AMS", "SCHIPHOL": "AMS", "AMSTERDAM SCHIPHOL": "AMS",
+    "ROME FIUMICINO": "FCO", "FIUMICINO": "FCO", "LEONARDO DA VINCI": "FCO",
+    "ROME CIAMPINO": "CIA", "CIAMPINO": "CIA",
+    "MILAN MALPENSA": "MXP", "MALPENSA": "MXP",
+    "MILAN LINATE": "LIN", "LINATE": "LIN",
+    "MADRID BARAJAS": "MAD", "BARAJAS": "MAD", "ADOLFO SUAREZ": "MAD",
+    "BARCELONA": "BCN", "EL PRAT": "BCN",
+    "ATHENS": "ATH", "ELEFTHERIOS VENIZELOS": "ATH",
+    "PRAGUE": "PRG", "VACLAV HAVEL": "PRG",
+    "VIENNA": "VIE", "SCHWECHAT": "VIE",
+    "ZURICH": "ZRH",
+    "GENEVA": "GVA",
+    "BRUSSELS": "BRU", "ZAVENTEM": "BRU",
+    "LISBON": "LIS", "HUMBERTO DELGADO": "LIS",
+    "OSLO": "OSL", "OSLO GARDERMOEN": "OSL", "GARDERMOEN": "OSL",
+    "STOCKHOLM ARLANDA": "ARN", "ARLANDA": "ARN",
+    "HELSINKI": "HEL", "VANTAA": "HEL",
+    "COPENHAGEN": "CPH", "KASTRUP": "CPH",
+    "WARSAW": "WAW", "CHOPIN": "WAW",
+    "BUDAPEST": "BUD", "LISZT FERENC": "BUD",
+    "BUCHAREST": "OTP", "BUCHAREST OTOPENI": "OTP", "HENRI COANDA": "OTP",
+    "SOFIA": "SOF",
+    "BELGRADE": "BEG", "NIKOLA TESLA": "BEG",
+    "ZAGREB": "ZAG",
+    # СНГ
+    "KYIV BORYSPIL": "KBP", "BORYSPIL": "KBP",
+    "MINSK": "MSQ", "MINSK NATIONAL": "MSQ",
+    "TBILISI": "TBS",
+    "YEREVAN ZVARTNOTS": "EVN", "ZVARTNOTS": "EVN",
+    "BAKU HEYDAR ALIYEV": "GYD", "HEYDAR ALIYEV": "GYD",
+    "ALMATY": "ALA",
+    "TASHKENT": "TAS", "TASHKENT INTERNATIONAL": "TAS",
+    # Азия / прочие
+    "BEIJING CAPITAL": "PEK", "CAPITAL": "PEK",
+    "SHANGHAI PUDONG": "PVG", "PUDONG": "PVG",
+    "HONG KONG": "HKG",
+    "SINGAPORE CHANGI": "SIN", "CHANGI": "SIN",
+    "TOKYO NARITA": "NRT", "NARITA": "NRT",
+    "TOKYO HANEDA": "HND", "HANEDA": "HND",
+    "BANGKOK SUVARNABHUMI": "BKK", "SUVARNABHUMI": "BKK",
+    "DELHI": "DEL", "INDIRA GANDHI": "DEL",
+    "MUMBAI": "BOM", "CHHATRAPATI SHIVAJI": "BOM",
+    "CAIRO": "CAI",
+    "TEL AVIV": "TLV", "BEN GURION": "TLV",
+    "AMMAN": "AMM", "QUEEN ALIA": "AMM",
+    "RIYADH": "RUH", "KING KHALID": "RUH",
+    "JEDDAH": "JED", "KING ABDULAZIZ": "JED",
+    "CASABLANCA": "CMN", "MOHAMMED V": "CMN",
+    "NEW YORK JFK": "JFK",
+    "NEW YORK NEWARK": "EWR", "NEWARK": "EWR",
+    "LOS ANGELES": "LAX",
+    "MIAMI": "MIA",
+    "TORONTO PEARSON": "YYZ", "PEARSON": "YYZ",
+}
+
+
+def _airport_name_to_iata(name: str) -> Optional[str]:
+    """Ищет IATA-код по названию аэропорта (нечувствительно к регистру)."""
+    if not name:
+        return None
+    key = name.upper().strip()
+    # Точное совпадение
+    if key in AIRPORT_NAME_TO_IATA:
+        return AIRPORT_NAME_TO_IATA[key]
+    # Частичное: ищем ключ-подстроку в name или name в ключе
+    for k, v in AIRPORT_NAME_TO_IATA.items():
+        if k in key or key in k:
+            return v
+    return None
+
+
+def _extract_fare_calc_iata(lines: list) -> Optional[Tuple[str, str]]:
+    """
+    Извлекает IATA-коды вылета/прилёта из строки расчёта тарифа BSP вида:
+      MOW DP IST179.36NUC179.36END
+    Возвращает (dep_iata, arr_iata) или None.
+    """
+    # Паттерн: CITY_CODE AIRLINE_CODE CITY_CODEfares...
+    FARE_CALC_RE = re.compile(r'\b([A-Z]{3})\s+[A-Z]{2}\s+([A-Z]{3})[\d.]')
+    for line in lines:
+        m = FARE_CALC_RE.search(line)
+        if m:
+            return m.group(1), m.group(2)
+    return None
 
 
 def _looks_like_city(s: str) -> bool:
@@ -772,19 +944,21 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
 
         lines = [ln.strip() for ln in text.split('\n')]
 
-        # Подход 1: маршрутная строка вида "CITY FLIGHT CL DATE HHMM"
+        # Подход 1: маршрутная строка вида "CITY [(AIRPORT)] FLIGHT CL DATE HHMM"
         itinerary = _extract_airline_itinerary(lines)
         if itinerary:
             if not data.get('flight_number'):
                 data['flight_number'] = itinerary['flight_no']
             if itinerary['dep_city']:
-                data['departure_place'] = itinerary['dep_city']
+                iata = itinerary.get('dep_iata') or ''
+                data['departure_place'] = f"{itinerary['dep_city']} ({iata})" if iata else itinerary['dep_city']
             if itinerary['dep_date']:
                 data['departure_date'] = itinerary['dep_date']
             if itinerary['dep_time']:
                 data['departure_time'] = itinerary['dep_time']
             if itinerary['arr_city']:
-                data['arrival_place'] = itinerary['arr_city']
+                iata = itinerary.get('arr_iata') or ''
+                data['arrival_place'] = f"{itinerary['arr_city']} ({iata})" if iata else itinerary['arr_city']
             if itinerary['arr_date']:
                 data['arrival_date'] = itinerary['arr_date']
             if itinerary['arr_time']:
