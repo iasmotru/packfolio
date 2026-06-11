@@ -694,14 +694,11 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   font-weight: 600;
   cursor: pointer;
   border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  /* По умолчанию невидима — показывается только JS-ом во время свайпа */
+  visibility: hidden;
 }
 
 .swipe-delete-action svg { flex-shrink: 0; }
-
-/* Скрываем кнопку удаления во время анимации переворота карточки */
-.swipe-wrap.is-flipping .swipe-delete-action {
-  visibility: hidden;
-}
 
 .doc-card {
   background: var(--bg-card);
