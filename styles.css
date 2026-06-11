@@ -166,6 +166,20 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   gap: 16px;
   box-shadow: var(--shadow);
   pointer-events: all;
+  position: relative;
+}
+
+/* Плавающее выделение активного таба */
+.nav-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 44px;
+  background: rgba(70, 77, 245, 0.35);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  transition: left 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), width 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+  will-change: left, width;
 }
 
 .nav-btn {
@@ -197,10 +211,11 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   line-height: 1;
 }
 
-/* Активный таб — только цвет акцента (из Figma: active label #464DF5) */
-.nav-btn.active { color: var(--accent); }
-.nav-btn:not(.active) { color: var(--text); opacity: .7; }
-.nav-btn:active { opacity: .5; }
+/* Активный таб — акцент, неактивные приглушены */
+.nav-btn.active { color: var(--accent); opacity: 1; }
+.nav-btn:not(.active) { color: var(--text); opacity: .55; }
+.nav-btn { transition: color .2s, opacity .2s; }
+.nav-btn:active { opacity: .4; }
 
 /* ──────────────────────────────────────────────
    FAB

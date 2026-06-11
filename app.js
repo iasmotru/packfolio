@@ -3324,6 +3324,7 @@ const App = {
 
     // Обновляем навигацию
     qsa('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    updateNavIndicator(tab);
 
     try {
       if (tab === 'home') {
@@ -3376,7 +3377,23 @@ function debounce(fn, ms) {
 document.addEventListener('DOMContentLoaded', () => {
   App.init();
   setupKeyboardAdjust();
+  // Позиционируем индикатор после рендера (нужен layout)
+  requestAnimationFrame(() => updateNavIndicator(State.currentTab || 'home'));
 });
+
+// ──────────────────────────────────────────────
+// Плавающий индикатор таб-бара
+// ──────────────────────────────────────────────
+function updateNavIndicator(tab) {
+  const indicator = qs('#nav-indicator');
+  const btn = qs(`.nav-btn[data-tab="${tab}"]`);
+  const nav = qs('.bottom-nav');
+  if (!indicator || !btn || !nav) return;
+  const navRect = nav.getBoundingClientRect();
+  const btnRect = btn.getBoundingClientRect();
+  indicator.style.left  = (btnRect.left - navRect.left) + 'px';
+  indicator.style.width = btnRect.width + 'px';
+}
 
 // ──────────────────────────────────────────────
 // Keyboard / visualViewport fix (iOS Telegram)
