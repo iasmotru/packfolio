@@ -111,6 +111,38 @@ function el(tag, cls, html) {
   return e;
 }
 
+/**
+ * Навешивает на строку поиска стандартное поведение:
+ * — скрывает нав + FAB при фокусе (если не скрыты edit-mode'ом)
+ * — восстанавливает при blur
+ * — блюрит на Enter / Search
+ */
+function setupSearchInput(input) {
+  let _hiddenBySearch = false;
+  input.setAttribute('enterkeyhint', 'search');
+  input.addEventListener('focus', () => {
+    const nav = document.querySelector('.bottom-nav-wrap');
+    const fab = document.querySelector('#fab');
+    if (nav && nav.style.display !== 'none') {
+      nav.style.display = 'none';
+      if (fab) fab.style.display = 'none';
+      _hiddenBySearch = true;
+    }
+  });
+  input.addEventListener('blur', () => {
+    if (_hiddenBySearch) {
+      const nav = document.querySelector('.bottom-nav-wrap');
+      const fab = document.querySelector('#fab');
+      if (nav) nav.style.display = '';
+      if (fab) fab.style.display = '';
+      _hiddenBySearch = false;
+    }
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+  });
+}
+
 function showToast(msg, duration = 2500) {
   const t = qs('#toast');
   t.textContent = msg;
@@ -1082,6 +1114,7 @@ function renderTripsPage() {
     State.tripFilters.q = searchInput.value;
     applyTripFilters();
   }, 300);
+  setupSearchInput(searchInput);
   searchRow.appendChild(searchInput);
   controlsCol.appendChild(searchRow);
 
@@ -2014,6 +2047,7 @@ function openArchiveModal() {
     const searchInput = el('input', 'search-input');
     searchInput.placeholder = 'Поиск в архиве...';
     searchInput.oninput = debounce(() => { archiveQ = searchInput.value; loadArchive(); }, 300);
+    setupSearchInput(searchInput);
     searchRow.appendChild(searchInput);
 
     const clearBtn = el('button', 'archive-icon-btn');
@@ -2122,6 +2156,7 @@ async function renderDocsPage() {
     State.docFilters.q = searchInput.value;
     applyDocFilters();
   }, 300);
+  setupSearchInput(searchInput);
   searchRow.appendChild(searchInput);
 
   const archiveBtn = el('button', 'archive-icon-btn');
