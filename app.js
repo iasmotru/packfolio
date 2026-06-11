@@ -2553,6 +2553,9 @@ async function renderDocsPage() {
 async function applyDocFilters(listEl) {
   listEl = listEl || qs('#doc-list');
   if (!listEl) return;
+  // Сохраняем позицию скролла, чтобы не улетать в начало при обновлении списка
+  const pageEl = qs('#page-content');
+  const savedScroll = pageEl ? pageEl.scrollTop : 0;
   listEl.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
 
   try {
@@ -2603,8 +2606,10 @@ async function applyDocFilters(listEl) {
         listEl.appendChild(card);
       }
     });
+    if (pageEl) pageEl.scrollTop = savedScroll;
   } catch (e) {
     listEl.innerHTML = `<div class="empty-state"><p>Ошибка загрузки: ${e.message}</p></div>`;
+    if (pageEl) pageEl.scrollTop = savedScroll;
   }
 }
 
