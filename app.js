@@ -3386,13 +3386,14 @@ document.addEventListener('DOMContentLoaded', () => {
 // ──────────────────────────────────────────────
 function updateNavIndicator(tab) {
   const indicator = qs('#nav-indicator');
-  const btn = qs(`.nav-btn[data-tab="${tab}"]`);
   const nav = qs('.bottom-nav');
-  if (!indicator || !btn || !nav) return;
-  const navRect = nav.getBoundingClientRect();
-  const btnRect = btn.getBoundingClientRect();
-  indicator.style.left  = (btnRect.left - navRect.left) + 'px';
-  indicator.style.width = btnRect.width + 'px';
+  if (!indicator || !nav) return;
+  const tabs = ['home', 'trips', 'docs', 'calendar'];
+  const idx = tabs.indexOf(tab);
+  if (idx === -1) return;
+  const w = nav.offsetWidth / 4;
+  indicator.style.width = w + 'px';
+  indicator.style.left  = (idx * w) + 'px';
 }
 
 // ──────────────────────────────────────────────
