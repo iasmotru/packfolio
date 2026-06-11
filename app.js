@@ -3283,11 +3283,24 @@ function renderProfilePage() {
   qs('#fab').classList.add('hidden');
 
   const user = State.user || {};
-  const initials = ((user.first_name || '')[0] || '') + ((user.last_name || '')[0] || '');
-  const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
+  const fullName  = [user.first_name, user.last_name].filter(Boolean).join(' ');
+  const fallbackLetter = (user.username || user.first_name || '?')[0].toUpperCase();
 
   // ── Шапка с аватаром ──────────────────────────────────────────────
-  const avatarEl = el('div', 'profile-avatar', initials.toUpperCase() || '?');
+  // Telegram передаёт photo_url в initDataUnsafe; если нет — первая буква ника
+  const tgPhotoUrl = TG?.initDataUnsafe?.user?.photo_url || user.photo_url;
+  let avatarEl;
+  if (tgPhotoUrl) {
+    avatarEl = el('div', 'profile-avatar');
+    const img = document.createElement('img');
+    img.src = tgPhotoUrl;
+    img.alt = fullName;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+    img.onerror = () => { img.remove(); avatarEl.textContent = fallbackLetter; };
+    avatarEl.appendChild(img);
+  } else {
+    avatarEl = el('div', 'profile-avatar', fallbackLetter);
+  }
   const nameEl   = el('div', 'profile-name', fullName || 'Пользователь');
   const usernameEl = el('div', 'profile-username', user.username ? '@' + user.username : '');
 
