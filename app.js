@@ -1923,8 +1923,10 @@ function openArchiveModal() {
     sheet.appendChild(header);
 
     // ── Список ──
+    // Скролл отдан самому modal-sheet, чтобы карточки проходили под sticky-хэдером
+    // и backdrop-filter в хэдере работал (размывал контент позади)
     const list = el('div', 'card-list');
-    list.style.cssText = 'padding:0 16px;flex:1;overflow-y:auto;min-height:0;';
+    list.style.cssText = 'padding:0 16px 24px;';
     sheet.appendChild(list);
 
     const loadArchive = async () => {
