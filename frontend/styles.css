@@ -403,8 +403,8 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 .archive-modal-sticky {
   position: sticky;
   top: 0;
-  margin: 0;
-  padding-bottom: 44px; /* достаточно места чтобы mask-gradient фейдился ниже чипов */
+  margin: 0 0 -36px; /* компенсирует padding-bottom: 44px → итоговый зазор ~8px как на docs */
+  padding-bottom: 44px;
   flex-shrink: 0;
 }
 
