@@ -397,11 +397,14 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   flex-direction: column;
 }
 
-/* В модале архива хэдер не sticky — просто прижат к верху */
+/* В модале архива хэдер не sticky — просто прижат к верху.
+   Паддинг перебиваем: docs-sticky использует -44px margin-bottom чтобы
+   перекрыть 52px bottom-padding, в архиве негативного отступа нет. */
 .archive-modal-sticky {
   position: static;
   top: auto;
   margin: 0;
+  padding-bottom: 16px;
   flex-shrink: 0;
 }
 
