@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from auth import get_current_user_id
+from auth import get_current_user_id, decode_token, bearer_scheme, ENV
 from models import Document, DocumentTag, Tag, WidgetData, get_db
 from parser import parse_document
 
@@ -534,11 +534,21 @@ async def replace_file(
 
 @router.get("/{doc_id}/file")
 def download_file(
-    doc_id:  int,
-    user_id: int     = Depends(get_current_user_id),
-    db:      Session = Depends(get_db),
+    doc_id:      int,
+    db:          Session = Depends(get_db),
+    token:       Optional[str] = Query(default=None, include_in_schema=False),
+    credentials = Depends(bearer_scheme),
 ):
-    """Отдаёт исходный файл (inline для изображений, attachment для PDF)."""
+    """Отдаёт исходный файл. Токен принимается из Authorization-заголовка или ?token= query-параметра."""
+    if ENV == "dev":
+        user_id = 1
+    elif credentials is not None:
+        user_id = decode_token(credentials.credentials)
+    elif token is not None:
+        user_id = decode_token(token)
+    else:
+        raise HTTPException(status_code=401, detail="Отсутствует токен авторизации")
+
     doc = db.query(Document).filter(Document.id == doc_id, Document.user_id == user_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Документ не найден")

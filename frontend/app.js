@@ -2028,7 +2028,8 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   if (doc.file_path) {
     openFileBtn.onclick = (e) => {
       e.stopPropagation();
-      window.open(`${CONFIG.API_BASE}/api/documents/${doc.id}/file`, '_blank');
+      const url = `${CONFIG.API_BASE}/api/documents/${doc.id}/file?token=${encodeURIComponent(State.token)}`;
+      window.open(url, '_blank');
     };
   } else {
     openFileBtn.disabled = true;
