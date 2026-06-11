@@ -111,6 +111,82 @@ function el(tag, cls, html) {
   return e;
 }
 
+/**
+ * Оборачивает карточку документа в контейнер со свайп-удалением влево.
+ * afterDelete() вызывается после успешного удаления.
+ */
+function wrapSwipeDelete(card, doc, afterDelete) {
+  const wrap = el('div', 'swipe-wrap');
+
+  const deleteAction = el('div', 'swipe-delete-action');
+  deleteAction.innerHTML = `
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Удалить</span>`;
+
+  deleteAction.onclick = async (e) => {
+    e.stopPropagation();
+    try {
+      await API.delete(`/api/documents/${doc.id}`);
+      State.documents = State.documents.filter(d => d.id !== doc.id);
+      wrap.style.transition = 'opacity 0.2s, max-height 0.3s';
+      wrap.style.opacity = '0';
+      wrap.style.maxHeight = '0';
+      wrap.style.overflow = 'hidden';
+      setTimeout(() => wrap.remove(), 350);
+      afterDelete?.();
+      showToast('Документ удалён');
+    } catch (err) { showToast('Ошибка: ' + err.message); }
+  };
+
+  wrap.appendChild(deleteAction);
+  wrap.appendChild(card);
+
+  const REVEAL = 80;
+  let startX = 0, startY = 0, baseX = 0, gestureDir = null, revealed = false;
+
+  const snapTo = (x, animate = true) => {
+    if (animate) card.style.transition = 'transform 0.22s cubic-bezier(0.25,1,0.5,1)';
+    card.style.transform = `translateX(${x}px)`;
+    revealed = x < 0;
+  };
+
+  card.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    baseX  = revealed ? -REVEAL : 0;
+    gestureDir = null;
+    card.style.transition = 'none';
+  }, { passive: true });
+
+  card.addEventListener('touchmove', e => {
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (!gestureDir) {
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4)
+        gestureDir = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+    }
+    if (gestureDir !== 'h') return;
+    const newX = Math.max(-REVEAL, Math.min(0, baseX + dx));
+    card.style.transform = `translateX(${newX}px)`;
+  }, { passive: true });
+
+  card.addEventListener('touchend', e => {
+    if (gestureDir !== 'h') return;
+    const dx = e.changedTouches[0].clientX - startX;
+    snapTo(baseX + dx < -REVEAL / 2 ? -REVEAL : 0);
+  }, { passive: true });
+
+  // Тап вне карточки — схлопываем
+  document.addEventListener('touchstart', e => {
+    if (revealed && !wrap.contains(e.target)) snapTo(0);
+  }, { passive: true });
+
+  return wrap;
+}
+
 /** Перемещает курсор и видимую область инпута в конец значения при фокусе */
 function moveCursorToEnd(input) {
   input.addEventListener('focus', () => {
@@ -2026,22 +2102,6 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
 
   container.appendChild(el('div', 'doc-card-divider'));
 
-  // ─ Удалить ─
-  const delWrap = el('div', 'doc-card-back-delete');
-  const delBtn = el('button', 'btn btn-danger', '🗑 Удалить');
-  delBtn.style.cssText = 'width:100%;padding:7px 12px;font-size:12px';
-  delBtn.onclick = async (e) => {
-    e.stopPropagation();
-    if (!confirm('Удалить документ?')) return;
-    try {
-      await API.delete(`/api/documents/${doc.id}`);
-      showToast('Документ удалён');
-      await applyDocFilters();
-    } catch (err) { showToast('Ошибка: ' + err.message); }
-  };
-  delWrap.appendChild(delBtn);
-  container.appendChild(delWrap);
-
   // Клик в любое место обратной стороны — переворот назад
   // (кнопки, превью, поездка, теги останавливают всплытие сами)
   container.onclick = () => onFlipBack();
@@ -2175,7 +2235,10 @@ function openArchiveModal() {
             </div>`;
           return;
         }
-        docs.forEach(doc => list.appendChild(buildDocMiniCard(doc)));
+        docs.forEach(doc => {
+          const card = buildDocMiniCard(doc);
+          list.appendChild(wrapSwipeDelete(card, doc, () => loadArchive()));
+        });
       } catch (e) {
         list.innerHTML = `<div class="empty-state"><p>Ошибка: ${e.message}</p></div>`;
       }
@@ -2292,7 +2355,10 @@ async function applyDocFilters(listEl) {
       return;
     }
 
-    docs.forEach(doc => listEl.appendChild(buildDocMiniCard(doc)));
+    docs.forEach(doc => {
+      const card = buildDocMiniCard(doc);
+      listEl.appendChild(wrapSwipeDelete(card, doc, () => applyDocFilters()));
+    });
   } catch (e) {
     listEl.innerHTML = `<div class="empty-state"><p>Ошибка загрузки: ${e.message}</p></div>`;
   }
