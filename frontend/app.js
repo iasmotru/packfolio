@@ -1492,6 +1492,7 @@ function buildDocMiniCard(doc, showAllFields = false) {
   // ─── Edit-mode state ──────────────────────────────────────────────────────
   let isEditMode = false;
   const fieldRefs = []; // { key, item, valueEl }
+  let outsideEditHandler = null;
 
   const editBtn = el('button', 'doc-card-edit-btn', 'Редактировать');
   editBtn.onclick = (e) => {
@@ -1552,6 +1553,34 @@ function buildDocMiniCard(doc, showAllFields = false) {
       else if (TIME_FIELDS.has(key)) applyTimeMask(inp);
       item.appendChild(inp);
     });
+
+    // Показываем диалог при клике вне карточки
+    outsideEditHandler = (e) => {
+      if (!isEditMode) return;
+      if (card.contains(e.target)) return;
+      if (e.target.closest('.datepicker-popup, .timepicker-popup')) return;
+      if (e.target.closest('.modal-overlay')) return;
+      showSaveConfirmDialog();
+    };
+    setTimeout(() => {
+      document.addEventListener('touchend', outsideEditHandler);
+      document.addEventListener('mousedown', outsideEditHandler);
+    }, 80);
+  }
+
+  function showSaveConfirmDialog() {
+    Modal.open(sheet => {
+      const msg = el('p', 'dialog-msg', 'Сохранить изменения?');
+      const row = el('div', 'dialog-btns');
+      const cancelBtn = el('button', 'btn btn-secondary', 'Отменить');
+      cancelBtn.onclick = () => { Modal.close(); exitEditMode(); };
+      const saveBtn = el('button', 'btn btn-primary', 'Сохранить');
+      saveBtn.onclick = () => { Modal.close(); saveAllEdits(); };
+      row.appendChild(cancelBtn);
+      row.appendChild(saveBtn);
+      sheet.appendChild(msg);
+      sheet.appendChild(row);
+    }, { center: true });
   }
 
   // ─── Save all edits ────────────────────────────────────────────────────────
@@ -1597,6 +1626,12 @@ function buildDocMiniCard(doc, showAllFields = false) {
     isEditMode = false;
     editBtn.textContent = 'Редактировать';
     editBtn.classList.remove('saving');
+    // Снимаем обработчик клика вне карточки
+    if (outsideEditHandler) {
+      document.removeEventListener('touchend', outsideEditHandler);
+      document.removeEventListener('mousedown', outsideEditHandler);
+      outsideEditHandler = null;
+    }
     // Возвращаем таб-бар и FAB
     const bottomNav = document.querySelector('.bottom-nav-wrap');
     if (bottomNav) bottomNav.style.display = '';
