@@ -606,14 +606,16 @@ function createDatePicker(anchorEl, onSelect) {
 
   const position = () => {
     const r = anchorEl.getBoundingClientRect();
+    const vv = window.visualViewport;
+    const viewH = vv ? vv.height : window.innerHeight;
     popup.style.left = Math.min(r.left, window.innerWidth - 280) + 'px';
-    const spaceBelow = window.innerHeight - r.bottom - 8;
+    popup.style.bottom = '';
+    const spaceBelow = viewH - r.bottom - 8;
     if (spaceBelow >= 280) {
       popup.style.top = (r.bottom + 4) + 'px';
-      popup.style.bottom = '';
     } else {
-      popup.style.top = '';
-      popup.style.bottom = (window.innerHeight - r.top + 4) + 'px';
+      // Позиционируем выше инпута, не выходя за верхний край экрана
+      popup.style.top = Math.max((vv ? vv.offsetTop : 0) + 8, r.top - 284) + 'px';
     }
   };
 
@@ -631,6 +633,7 @@ function applyDateMask(input) {
   input.placeholder = 'дд.мм.гг';
   input.maxLength = 8;
   let picker = null;
+  let suppressBlur = false; // не уничтожать пикер при нашем blur
 
   input.addEventListener('input', () => {
     let digits = input.value.replace(/\D/g, '').slice(0, 6);
@@ -649,12 +652,17 @@ function applyDateMask(input) {
       const [y, m, d] = isoDate.split('-');
       input.value = `${d}.${m}.${y.slice(-2)}`;
       picker = null;
-      input.blur();   // triggers save
     });
+    // Сразу убираем фокус — не даём iOS показать клавиатуру поверх пикера
+    suppressBlur = true;
+    input.blur();
+    setTimeout(() => { suppressBlur = false; }, 60);
   });
 
-  // Close picker when input blurs (e.g. user taps outside)
+  // Закрываем пикер только если blur вызван пользователем (тап вне пикера),
+  // а не нашим программным input.blur()
   input.addEventListener('blur', () => {
+    if (suppressBlur) return;
     if (picker) { picker.destroy(); picker = null; }
   });
 }
@@ -809,6 +817,8 @@ function applyDatetimeMask(input) {
     if (picker && digits.length >= 6) picker.highlight?.(toIsoDate(m.slice(0, 8)));
   });
 
+  let suppressBlur = false;
+
   input.addEventListener('focus', () => {
     if (picker) return;
     picker = createDatePicker(input, isoDate => {
@@ -819,12 +829,16 @@ function applyDatetimeMask(input) {
       picker = createTimePicker(input, existingTime || null, time => {
         input.value = `${datePart} ${time}`;
         picker = null;
-        input.blur(); // триггер сохранения
       });
     });
+    // Сразу убираем фокус — не даём iOS показать клавиатуру поверх пикера
+    suppressBlur = true;
+    input.blur();
+    setTimeout(() => { suppressBlur = false; }, 60);
   });
 
   input.addEventListener('blur', () => {
+    if (suppressBlur) return;
     if (picker) { picker.destroy(); picker = null; }
   });
 }
