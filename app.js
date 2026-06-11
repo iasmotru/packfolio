@@ -2253,8 +2253,10 @@ function openDocCard(docOrId) {
   const doc = typeof docOrId === 'object' ? docOrId : null;
 
   const show = (doc) => {
+    const info = getDocInfo(doc.doc_type);
     Modal.open(sheet => {
       sheet.classList.add('modal-full');
+      sheet.appendChild(Modal.buildHeader(`${info.icon} ${escHtml(doc.title)}`));
       const body = el('div', 'modal-body');
       body.style.paddingTop = '8px';
       const card = buildDocMiniCard(doc, true);
