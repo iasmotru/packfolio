@@ -1642,6 +1642,18 @@ function buildDocMiniCard(doc, showAllFields = false) {
     if (bottomNav) bottomNav.style.display = 'none';
     const fab = document.querySelector('#fab');
     if (fab) fab.style.display = 'none';
+
+    // Заменяем title на инпут для переименования
+    const titleDiv = header.querySelector('.doc-title');
+    if (titleDiv && !header.querySelector('.card-title-input')) {
+      titleDiv.style.display = 'none';
+      const titleInp = el('input', 'card-edit-input card-title-input');
+      titleInp.value = doc.title;
+      titleInp.placeholder = 'Название документа';
+      titleInp.onclick = e => e.stopPropagation();
+      titleDiv.parentNode.insertBefore(titleInp, titleDiv);
+    }
+
     const wdata = doc.widget?.data || {};
     fieldRefs.forEach(({ key, item, valueEl }) => {
       valueEl.style.display = 'none';
@@ -1711,11 +1723,18 @@ function buildDocMiniCard(doc, showAllFields = false) {
       const nights = calcNights(ci, co);
       if (nights !== null) patch.nights = String(nights);
     }
+    // Сохраняем title если был изменён
+    const titleInp = header.querySelector('.card-title-input');
+    const newTitle = titleInp?.value.trim();
     try {
       await API.put(`/api/documents/${doc.id}/widget`, patch);
       if (!doc.widget) doc.widget = { data: {} };
       if (!doc.widget.data) doc.widget.data = {};
       Object.assign(doc.widget.data, patch);
+      if (newTitle && newTitle !== doc.title) {
+        await API.put(`/api/documents/${doc.id}`, { title: newTitle });
+        doc.title = newTitle;
+      }
       showToast('Сохранено');
     } catch (err) {
       showToast('Ошибка: ' + err.message);
@@ -1751,6 +1770,16 @@ function buildDocMiniCard(doc, showAllFields = false) {
       valueEl.className = `doc-field-value${!displayed ? ' empty' : ''}`;
       valueEl.style.display = '';
     });
+    // Восстанавливаем title
+    const titleInp = header.querySelector('.card-title-input');
+    if (titleInp) {
+      const titleDiv = header.querySelector('.doc-title');
+      if (titleDiv) {
+        titleDiv.textContent = doc.title;
+        titleDiv.style.display = '';
+      }
+      titleInp.remove();
+    }
     // Скроллим карточку в видимую зону (на случай если экран остался прокрученным после клавиатуры)
     setTimeout(() => {
       front.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1907,21 +1936,6 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   // ─ Кнопки действий (компактные) ─
   const actions = el('div', 'doc-card-back-actions');
 
-  const renameBtn = el('button', 'btn btn-secondary', '');
-  renameBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Переименовать`;
-  renameBtn.onclick = async (e) => {
-    e.stopPropagation();
-    const newTitle = prompt('Новое название:', doc.title);
-    if (!newTitle || newTitle.trim() === doc.title) return;
-    try {
-      await API.put(`/api/documents/${doc.id}`, { title: newTitle.trim() });
-      doc.title = newTitle.trim();
-      titleEl.querySelector('.doc-title').textContent = doc.title;
-      showToast('Переименовано');
-      onFrontRefresh?.();
-    } catch (err) { showToast('Ошибка: ' + err.message); }
-  };
-
   const replaceBtn = el('button', 'btn btn-secondary', '');
   replaceBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Заменить`;
   replaceBtn.onclick = (e) => {
@@ -1933,7 +1947,6 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   walletBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet <span class="pro-badge">Pro</span>`;
   walletBtn.onclick = (e) => { e.stopPropagation(); openProModal(); };
 
-  actions.appendChild(renameBtn);
   actions.appendChild(replaceBtn);
   actions.appendChild(walletBtn);
   container.appendChild(actions);
