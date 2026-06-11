@@ -1508,9 +1508,11 @@ function buildDocMiniCard(doc, showAllFields = false) {
     isEditMode = true;
     editBtn.textContent = 'Сохранить';
     editBtn.classList.add('saving');
-    // Скрываем таб-бар, чтобы он не перекрывал карточку во время редактирования
+    // Скрываем таб-бар и FAB, чтобы они не перекрывали карточку во время редактирования
     const bottomNav = document.querySelector('.bottom-nav-wrap');
     if (bottomNav) bottomNav.style.display = 'none';
+    const fab = document.querySelector('#fab');
+    if (fab) fab.style.display = 'none';
     const wdata = doc.widget?.data || {};
     fieldRefs.forEach(({ key, item, valueEl }) => {
       valueEl.style.display = 'none';
@@ -1568,9 +1570,11 @@ function buildDocMiniCard(doc, showAllFields = false) {
     isEditMode = false;
     editBtn.textContent = 'Редактировать';
     editBtn.classList.remove('saving');
-    // Возвращаем таб-бар
+    // Возвращаем таб-бар и FAB
     const bottomNav = document.querySelector('.bottom-nav-wrap');
     if (bottomNav) bottomNav.style.display = '';
+    const fab = document.querySelector('#fab');
+    if (fab) fab.style.display = '';
     const newData = doc.widget?.data || {};
     fieldRefs.forEach(({ key, item, valueEl }) => {
       item.onclick = null;
