@@ -1508,6 +1508,9 @@ function buildDocMiniCard(doc, showAllFields = false) {
     isEditMode = true;
     editBtn.textContent = 'Сохранить';
     editBtn.classList.add('saving');
+    // Скрываем таб-бар, чтобы он не перекрывал карточку во время редактирования
+    const bottomNav = document.querySelector('.bottom-nav-wrap');
+    if (bottomNav) bottomNav.style.display = 'none';
     const wdata = doc.widget?.data || {};
     fieldRefs.forEach(({ key, item, valueEl }) => {
       valueEl.style.display = 'none';
@@ -1565,6 +1568,9 @@ function buildDocMiniCard(doc, showAllFields = false) {
     isEditMode = false;
     editBtn.textContent = 'Редактировать';
     editBtn.classList.remove('saving');
+    // Возвращаем таб-бар
+    const bottomNav = document.querySelector('.bottom-nav-wrap');
+    if (bottomNav) bottomNav.style.display = '';
     const newData = doc.widget?.data || {};
     fieldRefs.forEach(({ key, item, valueEl }) => {
       item.onclick = null;
@@ -1575,6 +1581,10 @@ function buildDocMiniCard(doc, showAllFields = false) {
       valueEl.className = `doc-field-value${!displayed ? ' empty' : ''}`;
       valueEl.style.display = '';
     });
+    // Скроллим карточку в видимую зону (на случай если экран остался прокрученным после клавиатуры)
+    setTimeout(() => {
+      front.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
   }
 
   // UNKNOWN type selector
@@ -3367,6 +3377,22 @@ function setupKeyboardAdjust() {
     document.querySelectorAll('.modal-sheet:not(.modal-full)').forEach(sheet => {
       sheet.style.maxHeight = '';
     });
+    // Если в данный момент редактируется карточка — скроллим её в зону видимости
+    setTimeout(() => {
+      const editingCard = document.querySelector('.doc-card .card-edit-input')?.closest('.doc-card');
+      if (editingCard) {
+        const scrollEl = findScrollableParent(editingCard);
+        if (scrollEl) {
+          const rect = editingCard.getBoundingClientRect();
+          const containerRect = scrollEl.getBoundingClientRect();
+          if (rect.top < containerRect.top) {
+            scrollEl.scrollTop -= containerRect.top - rect.top + 16;
+          }
+        } else {
+          editingCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    }, 150);
   };
 
   window.visualViewport.addEventListener('resize', () => {
