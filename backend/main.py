@@ -74,6 +74,17 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @app.on_event("startup")
 def on_startup():
     create_tables()
+    # Добавляем новые колонки в существующую таблицу (SQLite не поддерживает ALTER TABLE ADD IF NOT EXISTS)
+    from sqlalchemy import text
+    from models import engine as _engine
+    with _engine.connect() as conn:
+        existing = [row[1] for row in conn.execute(text("PRAGMA table_info(users)")).fetchall()]
+        if "is_pro" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN is_pro BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
+        if "pro_until" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN pro_until DATETIME"))
+            conn.commit()
     print("✓ Таблицы созданы / обновлены")
 
     # Авто-сид в dev-режиме
@@ -147,6 +158,8 @@ def auth_telegram(body: AuthRequest, db: Session = Depends(get_db)):
             "first_name": user.first_name,
             "last_name":  user.last_name,
             "username":   user.username,
+            "is_pro":     bool(user.is_pro),
+            "pro_until":  user.pro_until.isoformat() if user.pro_until else None,
         },
     }
 

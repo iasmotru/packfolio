@@ -3273,6 +3273,125 @@ async function loadAllData() {
 }
 
 // ──────────────────────────────────────────────
+// Профиль
+// ──────────────────────────────────────────────
+
+function renderProfilePage() {
+  const c = qs('#page-content');
+  c.innerHTML = '';
+  qs('#page-title').textContent = 'Профиль';
+  qs('#fab').classList.add('hidden');
+
+  const user = State.user || {};
+  const initials = ((user.first_name || '')[0] || '') + ((user.last_name || '')[0] || '');
+  const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ');
+
+  // ── Шапка с аватаром ──────────────────────────────────────────────
+  const avatarEl = el('div', 'profile-avatar', initials.toUpperCase() || '?');
+  const nameEl   = el('div', 'profile-name', fullName || 'Пользователь');
+  const usernameEl = el('div', 'profile-username', user.username ? '@' + user.username : '');
+
+  const headerCard = el('div', 'profile-card profile-header-card');
+  headerCard.appendChild(avatarEl);
+  const nameBlock = el('div', 'profile-name-block');
+  nameBlock.appendChild(nameEl);
+  if (user.username) nameBlock.appendChild(usernameEl);
+  headerCard.appendChild(nameBlock);
+  c.appendChild(headerCard);
+
+  // ── Статистика ────────────────────────────────────────────────────
+  const statsCard = el('div', 'profile-card profile-stats-card');
+  const statTrips = el('div', 'profile-stat');
+  statTrips.innerHTML = `<div class="profile-stat-value">${State.trips.length}</div><div class="profile-stat-label">поездок</div>`;
+  const statDocs = el('div', 'profile-stat');
+  statDocs.innerHTML = `<div class="profile-stat-value">${State.documents.length}</div><div class="profile-stat-label">документов</div>`;
+  statsCard.appendChild(statTrips);
+  const statDivider = el('div', 'profile-stat-divider');
+  statsCard.appendChild(statDivider);
+  statsCard.appendChild(statDocs);
+  c.appendChild(statsCard);
+
+  // ── Ближайшая поездка ────────────────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = State.trips
+    .filter(t => t.start_date && t.start_date >= today)
+    .sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
+
+  const tripSectionLabel = el('div', 'profile-section-label', 'Ближайшая поездка');
+  c.appendChild(tripSectionLabel);
+
+  if (upcoming) {
+    const tripCard = el('div', 'profile-card profile-trip-card');
+    const tripTitle = el('div', 'profile-trip-title', escHtml(upcoming.title));
+    const tripDate  = el('div', 'profile-trip-date', formatDate(upcoming.start_date) + (upcoming.end_date ? ' — ' + formatDate(upcoming.end_date) : ''));
+    tripCard.appendChild(tripTitle);
+    tripCard.appendChild(tripDate);
+    if (upcoming.locations) {
+      const tripLoc = el('div', 'profile-trip-loc', '📍 ' + escHtml(upcoming.locations));
+      tripCard.appendChild(tripLoc);
+    }
+    c.appendChild(tripCard);
+  } else {
+    const noTrip = el('div', 'profile-card profile-empty-card', 'Нет предстоящих поездок');
+    c.appendChild(noTrip);
+  }
+
+  // ── Подписка Pro ────────────────────────────────────────────────
+  const proLabel = el('div', 'profile-section-label', 'Подписка Pro');
+  c.appendChild(proLabel);
+
+  const proCard = el('div', 'profile-card profile-pro-card');
+
+  if (user.is_pro && user.pro_until) {
+    const untilDate = new Date(user.pro_until).toLocaleDateString('ru-RU', { day:'numeric', month:'long', year:'numeric' });
+    proCard.innerHTML = `
+      <div class="profile-pro-active">
+        <div class="profile-pro-badge">Pro</div>
+        <div class="profile-pro-info">
+          <div class="profile-pro-title">Подписка активна</div>
+          <div class="profile-pro-until">Действует до ${untilDate}</div>
+        </div>
+      </div>`;
+  } else {
+    let selectedPlan = 'year';
+    proCard.innerHTML = `
+      <p class="profile-pro-desc">Оформите подписку, чтобы открыть все возможности Packfolio:</p>
+      <ul class="pro-feature-list">
+        <li class="pro-feature-item"><span class="pro-feature-icon">✈️</span><span>Поездки без ограничений</span></li>
+        <li class="pro-feature-item"><span class="pro-feature-icon">🪪</span><span>Добавление документов в Wallet</span></li>
+        <li class="pro-feature-item"><span class="pro-feature-icon">👥</span><span>Совместные поездки</span></li>
+      </ul>
+      <div class="pro-plans" id="profile-pro-plans">
+        <label class="pro-plan" data-plan="month">
+          <input type="radio" name="profile-plan" value="month" style="display:none">
+          <div class="pro-plan-name">Месяц</div>
+          <div class="pro-plan-price">⭐ 250</div>
+        </label>
+        <label class="pro-plan active" data-plan="year">
+          <input type="radio" name="profile-plan" value="year" style="display:none" checked>
+          <div class="pro-plan-name">Год <span class="pro-badge">−30%</span></div>
+          <div class="pro-plan-price">⭐ 2100</div>
+        </label>
+      </div>`;
+
+    proCard.querySelectorAll('.pro-plan').forEach(pl => {
+      pl.onclick = () => {
+        proCard.querySelectorAll('.pro-plan').forEach(p => p.classList.remove('active'));
+        pl.classList.add('active');
+        selectedPlan = pl.dataset.plan;
+      };
+    });
+
+    const payBtn = el('button', 'btn btn-primary btn-full', 'Оплатить');
+    payBtn.style.marginTop = '16px';
+    payBtn.onclick = () => showToast('Оплата временно недоступна');
+    proCard.appendChild(payBtn);
+  }
+
+  c.appendChild(proCard);
+}
+
+// ──────────────────────────────────────────────
 // Навигация
 // ──────────────────────────────────────────────
 
@@ -3281,7 +3400,7 @@ const App = {
     tgInit();
     State.user = TG?.initDataUnsafe?.user || { id: 1, first_name: 'Packfolio' };
 
-    const TABS = ['trips', 'docs', 'calendar'];
+    const TABS = ['trips', 'docs', 'calendar', 'profile'];
     const initialTab = TABS.includes(location.hash.replace('#', '')) ? location.hash.replace('#', '') : 'trips';
     this.navigate(initialTab);
 
@@ -3333,6 +3452,8 @@ const App = {
         renderDocsPage();
       } else if (tab === 'calendar') {
         renderCalendarPage();
+      } else if (tab === 'profile') {
+        renderProfilePage();
       }
     } catch (e) {
       console.error('navigate error:', e);
@@ -3376,7 +3497,7 @@ document.addEventListener('DOMContentLoaded', () => {
   App.init();
   setupKeyboardAdjust();
   // Позиционируем индикатор после рендера (нужен layout)
-  requestAnimationFrame(() => updateNavIndicator(State.currentTab || 'home'));
+  requestAnimationFrame(() => updateNavIndicator(State.currentTab || 'trips'));
 });
 
 // ──────────────────────────────────────────────
@@ -3386,10 +3507,10 @@ function updateNavIndicator(tab) {
   const indicator = qs('#nav-indicator');
   const nav = qs('.bottom-nav');
   if (!indicator || !nav) return;
-  const tabs = ['trips', 'docs', 'calendar'];
+  const tabs = ['trips', 'docs', 'calendar', 'profile'];
   const idx = tabs.indexOf(tab);
   if (idx === -1) return;
-  const w = nav.offsetWidth / 3;
+  const w = nav.offsetWidth / 4;
   indicator.style.width = w + 'px';
   indicator.style.left  = (idx * w) + 'px';
 }
