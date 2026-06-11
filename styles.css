@@ -488,7 +488,8 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 .filter-chips::-webkit-scrollbar { display: none; }
 
 .chip {
-  flex-shrink: 0;
+  flex: 1;
+  min-width: max-content;
   padding: 7px 16px;
   border-radius: calc(var(--radius-xl) - 2px);
   border: none;
@@ -500,6 +501,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   cursor: pointer;
   transition: background .15s, color .15s;
   white-space: nowrap;
+  text-align: center;
 }
 
 .chip.active {
