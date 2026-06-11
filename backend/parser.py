@@ -477,23 +477,28 @@ def _extract_airline_itinerary(lines: list) -> Optional[Dict]:
             'dep_date': dep_date,
             'dep_time': dep_time,
             'dep_iata': dep_iata,
+            'dep_airport_raw': dep_airport_name,  # сырое название из скобок как фоллбэк
             'arr_date': None,
             'arr_time': None,
             'arr_city': None,
             'arr_iata': None,
+            'arr_airport_raw': None,
         }
 
         arr_city_candidate: Optional[str] = None  # временный кандидат города прилёта
+        arr_airport_raw_candidate: Optional[str] = None
 
         for j in range(i + 1, min(len(lines), i + 10)):
             ln = lines[j].strip()
 
             # Вариант Pobeda: строка "(AIRPORT_NAME) дата и время прибытия..."
             # "(VNUKOVO A) arrival date and time: 25AUG26 1205" — это аэропорт вылета
-            if not result['dep_iata']:
+            if not result['dep_airport_raw']:
                 dep_ap_line = re.match(r'^\(([^)]+)\)\s*(?:дата|arrival|прибытия)', ln, re.IGNORECASE)
                 if dep_ap_line:
-                    result['dep_iata'] = _airport_name_to_iata(dep_ap_line.group(1).strip())
+                    raw = dep_ap_line.group(1).strip()
+                    result['dep_airport_raw'] = raw
+                    result['dep_iata'] = _airport_name_to_iata(raw)
 
             # Arrival datetime: "arrival date and time: DATE HHMM" / "прибытия: DATE HHMM"
             if not result['arr_date']:
@@ -513,8 +518,10 @@ def _extract_airline_itinerary(lines: list) -> Optional[Dict]:
                 city_ap_m = re.match(r'^([A-Z][A-Z ]{2,30})\s*\(([^)]+)\)\s*$', ln)
                 if city_ap_m:
                     # Вариант A
+                    raw = city_ap_m.group(2).strip()
                     result['arr_city'] = city_ap_m.group(1).strip().title()
-                    result['arr_iata'] = _airport_name_to_iata(city_ap_m.group(2).strip())
+                    result['arr_airport_raw'] = raw
+                    result['arr_iata'] = _airport_name_to_iata(raw)
                 elif re.match(r'^[A-Z][A-Z ]+$', ln) and 3 < len(ln) < 40:
                     # Потенциальный город — сохраняем как кандидат
                     arr_city_candidate = ln.strip().title()
@@ -523,10 +530,12 @@ def _extract_airline_itinerary(lines: list) -> Optional[Dict]:
                     ap_only_m = re.match(r'^\(([^)]+)\)\s*$', ln)
                     if ap_only_m:
                         # Вариант B
+                        raw = ap_only_m.group(1).strip()
                         result['arr_city'] = arr_city_candidate
-                        result['arr_iata'] = _airport_name_to_iata(ap_only_m.group(1).strip())
+                        result['arr_airport_raw'] = raw
+                        result['arr_iata'] = _airport_name_to_iata(raw)
                     else:
-                        # Вариант C — зафиксировали просто город без аэропорта
+                        # Вариант C — город без аэропорта
                         result['arr_city'] = arr_city_candidate
 
         # Если IATA всё ещё не найдены — пробуем строку расчёта тарифа
@@ -951,14 +960,18 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
                 data['flight_number'] = itinerary['flight_no']
             if itinerary['dep_city']:
                 iata = itinerary.get('dep_iata') or ''
-                data['departure_place'] = f"{itinerary['dep_city']} ({iata})" if iata else itinerary['dep_city']
+                airport_raw = itinerary.get('dep_airport_raw') or ''
+                suffix = iata or airport_raw   # IATA приоритетнее, иначе сырое название
+                data['departure_place'] = f"{itinerary['dep_city']} ({suffix})" if suffix else itinerary['dep_city']
             if itinerary['dep_date']:
                 data['departure_date'] = itinerary['dep_date']
             if itinerary['dep_time']:
                 data['departure_time'] = itinerary['dep_time']
             if itinerary['arr_city']:
                 iata = itinerary.get('arr_iata') or ''
-                data['arrival_place'] = f"{itinerary['arr_city']} ({iata})" if iata else itinerary['arr_city']
+                airport_raw = itinerary.get('arr_airport_raw') or ''
+                suffix = iata or airport_raw
+                data['arrival_place'] = f"{itinerary['arr_city']} ({suffix})" if suffix else itinerary['arr_city']
             if itinerary['arr_date']:
                 data['arrival_date'] = itinerary['arr_date']
             if itinerary['arr_time']:
