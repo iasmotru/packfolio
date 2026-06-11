@@ -85,6 +85,11 @@ def on_startup():
         if "pro_until" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN pro_until DATETIME"))
             conn.commit()
+    with _engine.connect() as conn:
+        trip_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(trips)")).fetchall()]
+        if "is_shared" not in trip_cols:
+            conn.execute(text("ALTER TABLE trips ADD COLUMN is_shared BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
     print("✓ Таблицы созданы / обновлены")
 
     # Авто-сид в dev-режиме
