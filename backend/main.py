@@ -158,6 +158,7 @@ def auth_telegram(body: AuthRequest, db: Session = Depends(get_db)):
             "first_name": user.first_name,
             "last_name":  user.last_name,
             "username":   user.username,
+            "photo_url":  user_data.get("photo_url"),   # из Telegram initData
             "is_pro":     bool(user.is_pro),
             "pro_until":  user.pro_until.isoformat() if user.pro_until else None,
         },
