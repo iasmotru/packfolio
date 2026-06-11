@@ -151,11 +151,13 @@ function wrapSwipeDelete(card, doc, afterDelete) {
     if (animate) card.style.transition = 'transform 0.22s cubic-bezier(0.25,1,0.5,1)';
     card.style.transform = `translateX(${x}px)`;
     revealed = x < 0;
+    // Кнопка видна только когда карточка сдвинута влево
+    deleteAction.style.visibility = revealed ? 'visible' : 'hidden';
   };
 
   card.addEventListener('touchstart', e => {
-    // Не свайпаем когда карточка перевёрнута или идёт анимация
-    if (card.classList.contains('is-flipped') || wrap.classList.contains('is-flipping')) return;
+    // Не свайпаем когда карточка перевёрнута
+    if (card.classList.contains('is-flipped')) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     baseX  = revealed ? -REVEAL : 0;
@@ -173,6 +175,8 @@ function wrapSwipeDelete(card, doc, afterDelete) {
     if (gestureDir !== 'h') return;
     const newX = Math.max(-REVEAL, Math.min(0, baseX + dx));
     card.style.transform = `translateX(${newX}px)`;
+    // Показываем кнопку как только карточка начала двигаться влево
+    if (newX < 0) deleteAction.style.visibility = 'visible';
   }, { passive: true });
 
   card.addEventListener('touchend', e => {
@@ -1958,10 +1962,8 @@ function buildDocMiniCard(doc, showAllFields = false) {
     card.style.transform = '';
     void card.offsetWidth; // force reflow
 
-    // Ставим классы состояния
+    // Ставим класс состояния (блокирует свайп на обороте)
     card.classList.toggle('is-flipped', isFlipped);
-    const swipeWrap = card.closest('.swipe-wrap');
-    if (swipeWrap) swipeWrap.classList.add('is-flipping');
 
     if (isFlipped) {
       // Lock card height to the front face height before flipping
@@ -1985,11 +1987,6 @@ function buildDocMiniCard(doc, showAllFields = false) {
       }
       card.style.transition = 'transform 0.13s ease-out';
       card.style.transform = 'scaleX(1)';
-      // Снимаем is-flipping только когда обратная анимация (scaleX 0→1) тоже завершилась
-      card.addEventListener('transitionend', function handler2() {
-        card.removeEventListener('transitionend', handler2);
-        if (swipeWrap) swipeWrap.classList.remove('is-flipping');
-      }, { once: true });
     }, { once: true });
   }
 
