@@ -720,6 +720,8 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 .doc-card-back-face {
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Back button */

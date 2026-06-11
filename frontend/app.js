@@ -1970,8 +1970,12 @@ function buildDocMiniCard(doc, showAllFields = false) {
     // Ставим класс состояния (блокирует свайп на обороте)
     card.classList.toggle('is-flipped', isFlipped);
 
-    // Анимируем через scaleX(0): смена лица происходит пока карточка невидима,
-    // поэтому высота меняется незаметно и лочить её не нужно
+    // Фиксируем высоту по лицевой стороне перед переворотом;
+    // оборотная сторона скроллится через overflow-y: auto если не влезает
+    if (isFlipped) {
+      card.style.height = card.offsetHeight + 'px';
+    }
+
     card.style.transition = 'transform 0.13s ease-in';
     card.style.transform = 'scaleX(0)';
     card.addEventListener('transitionend', function handler() {
@@ -1982,6 +1986,7 @@ function buildDocMiniCard(doc, showAllFields = false) {
       } else {
         back.style.display = 'none';
         front.style.display = '';
+        card.style.height = ''; // возвращаем авто-высоту
       }
       card.style.transition = 'transform 0.13s ease-out';
       card.style.transform = 'scaleX(1)';
@@ -2015,45 +2020,20 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   header.appendChild(confBadge);
   container.appendChild(header);
 
-  // ─ Превью файла (90px) ─
-  const previewWrap = el('div', 'doc-card-preview-wrap');
-  if (doc.file_path) {
-    if (doc.file_mime?.startsWith('image/')) {
-      const img = el('img', 'doc-card-preview-img');
-      img.src = `${CONFIG.API_BASE}/api/documents/${doc.id}/file`;
-      img.alt = doc.title;
-      previewWrap.appendChild(img);
-    } else if (doc.file_mime === 'application/pdf') {
-      const iframe = el('iframe', 'doc-card-preview-iframe');
-      iframe.src = `${CONFIG.API_BASE}/api/documents/${doc.id}/file`;
-      iframe.title = doc.title;
-      previewWrap.appendChild(iframe);
-      previewWrap.appendChild(el('div', 'doc-card-preview-overlay'));
-    } else {
-      previewWrap.innerHTML = `<div class="doc-preview-placeholder" style="padding:16px;font-size:12px">📎 Файл</div>`;
-    }
-    previewWrap.onclick = (e) => {
-      e.stopPropagation();
-      Modal.open(sheet => {
-        const msg = el('p', 'dialog-msg', 'Открыть файл документа?');
-        const row = el('div', 'dialog-btns');
-        const cancelBtn = el('button', 'btn btn-secondary', 'Отменить');
-        cancelBtn.onclick = () => Modal.close();
-        const openBtn = el('button', 'btn btn-primary', 'Открыть');
-        openBtn.onclick = () => { Modal.close(); window.open(`${CONFIG.API_BASE}/api/documents/${doc.id}/file`, '_blank'); };
-        row.appendChild(cancelBtn);
-        row.appendChild(openBtn);
-        sheet.appendChild(msg);
-        sheet.appendChild(row);
-      }, { center: true });
-    };
-  } else {
-    previewWrap.innerHTML = `<div class="doc-preview-placeholder" style="padding:16px;font-size:12px">📄 Файл не загружен</div>`;
-  }
-  container.appendChild(previewWrap);
-
   // ─ Кнопки действий (компактные) ─
   const actions = el('div', 'doc-card-back-actions');
+
+  const openFileBtn = el('button', 'btn btn-secondary', '');
+  openFileBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="15 3 21 3 21 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="10" y1="14" x2="21" y2="3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Открыть`;
+  if (doc.file_path) {
+    openFileBtn.onclick = (e) => {
+      e.stopPropagation();
+      window.open(`${CONFIG.API_BASE}/api/documents/${doc.id}/file`, '_blank');
+    };
+  } else {
+    openFileBtn.disabled = true;
+    openFileBtn.style.opacity = '0.4';
+  }
 
   const replaceBtn = el('button', 'btn btn-secondary', '');
   replaceBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Заменить`;
@@ -2066,6 +2046,7 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   walletBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet <span class="pro-badge">Pro</span>`;
   walletBtn.onclick = (e) => { e.stopPropagation(); openProModal(); };
 
+  actions.appendChild(openFileBtn);
   actions.appendChild(replaceBtn);
   actions.appendChild(walletBtn);
   container.appendChild(actions);
