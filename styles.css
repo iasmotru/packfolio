@@ -172,11 +172,10 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
 /* Плавающее выделение активного таба */
 .nav-indicator {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 44px;
+  top: 0;
+  height: 100%;
   background: rgba(70, 77, 245, 0.35);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xl);
   pointer-events: none;
   transition: left 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), width 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
   will-change: left, width;
@@ -211,11 +210,11 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   line-height: 1;
 }
 
-/* Активный таб — акцент, неактивные приглушены */
-.nav-btn.active { color: var(--accent); opacity: 1; }
-.nav-btn:not(.active) { color: var(--text); opacity: .55; }
-.nav-btn { transition: color .2s, opacity .2s; }
-.nav-btn:active { opacity: .4; }
+/* Активный таб — акцент, неактивные полностью непрозрачны */
+.nav-btn.active { color: var(--accent); }
+.nav-btn:not(.active) { color: var(--text); }
+.nav-btn { transition: color .2s; }
+.nav-btn:active { opacity: .5; }
 
 /* ──────────────────────────────────────────────
    FAB
