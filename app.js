@@ -3302,16 +3302,37 @@ document.addEventListener('DOMContentLoaded', () => {
 // ──────────────────────────────────────────────
 function setupKeyboardAdjust() {
   // Скроллим активный инпут в зону видимости при фокусе
+  // Пробуем дважды: 350ms и 700ms — клавиатура iOS анимируется ~500ms
   document.addEventListener('focusin', (e) => {
     if (!e.target.matches('input, textarea, select')) return;
-    setTimeout(() => {
-      e.target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 320); // ждём анимацию клавиатуры
+    [350, 700].forEach(delay => {
+      setTimeout(() => {
+        const vv = window.visualViewport;
+        const target = e.target;
+        const rect = target.getBoundingClientRect();
+        const visibleBottom = vv ? vv.height : window.innerHeight;
+        if (rect.bottom > visibleBottom - 16) {
+          // Скроллим ближайший прокручиваемый контейнер
+          const scrollEl =
+            target.closest('.modal-body') ||
+            target.closest('.modal-sheet') ||
+            target.closest('.page');
+          if (scrollEl) {
+            scrollEl.scrollTop += rect.bottom - visibleBottom + 80;
+          } else {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      }, delay);
+    });
   });
 
-  // Уменьшаем высоту modal-overlay до реальной видимой области
+  // Уменьшаем высоту modal-overlay И modal-sheet до реальной видимой области.
+  // dvh не пересчитывается в iOS Telegram WKWebView при появлении клавиатуры,
+  // поэтому задаём max-height шиту вручную через JS.
   if (!window.visualViewport) return;
-  const onViewportResize = () => {
+
+  const applyKeyboard = () => {
     const vv = window.visualViewport;
     const visibleH = Math.round(vv.height);
     const offsetTop = Math.round(vv.offsetTop);
@@ -3320,16 +3341,24 @@ function setupKeyboardAdjust() {
       overlay.style.top     = offsetTop + 'px';
       overlay.style.bottom  = '';
     });
+    document.querySelectorAll('.modal-sheet').forEach(sheet => {
+      sheet.style.maxHeight = Math.round(visibleH * 0.95) + 'px';
+    });
   };
-  const onViewportRestore = () => {
+
+  const resetKeyboard = () => {
     document.querySelectorAll('.modal-overlay').forEach(overlay => {
       overlay.style.height = '';
       overlay.style.top    = '';
     });
+    document.querySelectorAll('.modal-sheet').forEach(sheet => {
+      sheet.style.maxHeight = '';
+    });
   };
 
   window.visualViewport.addEventListener('resize', () => {
-    const keyboardVisible = window.visualViewport.height < window.innerHeight * 0.85;
-    keyboardVisible ? onViewportResize() : onViewportRestore();
+    window.visualViewport.height < window.innerHeight * 0.85
+      ? applyKeyboard()
+      : resetKeyboard();
   });
 }
