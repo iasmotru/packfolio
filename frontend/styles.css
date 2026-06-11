@@ -720,8 +720,6 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 .doc-card-back-face {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  overflow: hidden;
 }
 
 /* Back button */
@@ -842,6 +840,14 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 /* Теги — компактный контейнер */
 .doc-card-back-tags {
   padding: 0 12px 8px;
+}
+
+/* Внутри карточки убираем лишние отступы у тегов и инпута */
+.doc-card-back-tags .selected-tags {
+  margin-top: 0;
+}
+.doc-card-back-tags .form-input {
+  margin-top: 4px !important;
 }
 
 /* Удалить — компактная кнопка */
