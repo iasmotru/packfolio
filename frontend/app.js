@@ -111,6 +111,15 @@ function el(tag, cls, html) {
   return e;
 }
 
+/** Перемещает курсор в конец значения при фокусе */
+function moveCursorToEnd(input) {
+  input.addEventListener('focus', () => {
+    const len = input.value.length;
+    // setTimeout нужен для iOS — браузер сбрасывает позицию после focus
+    setTimeout(() => input.setSelectionRange(len, len), 0);
+  });
+}
+
 /**
  * Навешивает на строку поиска стандартное поведение:
  * — скрывает нав + FAB при фокусе (если не скрыты edit-mode'ом)
@@ -1651,6 +1660,7 @@ function buildDocMiniCard(doc, showAllFields = false) {
       titleInp.value = doc.title;
       titleInp.placeholder = 'Название документа';
       titleInp.onclick = e => e.stopPropagation();
+      moveCursorToEnd(titleInp);
       titleDiv.parentNode.insertBefore(titleInp, titleDiv);
     }
 
@@ -1661,6 +1671,7 @@ function buildDocMiniCard(doc, showAllFields = false) {
       inp.value = displayFieldValue(key, wdata[key], wdata) || '';
       inp.dataset.editKey = key;
       inp.onclick = e => e.stopPropagation();
+      moveCursorToEnd(inp);
       if (DATETIME_FIELDS.has(key)) applyDatetimeMask(inp);
       else if (DATE_FIELDS.has(key)) applyDateMask(inp);
       else if (TIME_FIELDS.has(key)) applyTimeMask(inp);
