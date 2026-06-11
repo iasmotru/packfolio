@@ -2245,7 +2245,34 @@ async function applyDocFilters(listEl) {
   }
 }
 
-// ── Детальная страница документа ──
+// ── Открытие карточки документа (новый стиль) из любого контекста ──
+
+function openDocCard(docOrId) {
+  const docId = typeof docOrId === 'object' ? docOrId.id : docOrId;
+  // Если doc уже загружен — используем напрямую, иначе фетчим
+  const doc = typeof docOrId === 'object' ? docOrId : null;
+
+  const show = (doc) => {
+    Modal.open(sheet => {
+      sheet.classList.add('modal-full');
+      const body = el('div', 'modal-body');
+      body.style.paddingTop = '8px';
+      const card = buildDocMiniCard(doc, true);
+      body.appendChild(card);
+      sheet.appendChild(body);
+    }, { full: true });
+  };
+
+  if (doc) {
+    show(doc);
+  } else {
+    API.get(`/api/documents/${docId}`)
+      .then(show)
+      .catch(() => showToast('Не удалось загрузить документ'));
+  }
+}
+
+// ── Детальная страница документа (старый стиль — оставлен для совместимости) ──
 
 function openDocDetail(docOrId) {
   const loadAndShow = async () => {
@@ -3365,7 +3392,7 @@ function renderEventsList(container) {
         </div>
         <div class="event-arrow">›</div>
       `;
-      item.onclick = () => openDocDetail(ev.doc_id);
+      item.onclick = () => openDocCard(ev.doc_id);
     }
 
     list.appendChild(item);
