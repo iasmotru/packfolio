@@ -1970,12 +1970,8 @@ function buildDocMiniCard(doc, showAllFields = false) {
     // Ставим класс состояния (блокирует свайп на обороте)
     card.classList.toggle('is-flipped', isFlipped);
 
-    if (isFlipped) {
-      // Lock card height to the front face height before flipping
-      const h = card.offsetHeight;
-      card.style.height = h + 'px';
-      back.style.height = h + 'px';
-    }
+    // Анимируем через scaleX(0): смена лица происходит пока карточка невидима,
+    // поэтому высота меняется незаметно и лочить её не нужно
     card.style.transition = 'transform 0.13s ease-in';
     card.style.transform = 'scaleX(0)';
     card.addEventListener('transitionend', function handler() {
@@ -1986,9 +1982,6 @@ function buildDocMiniCard(doc, showAllFields = false) {
       } else {
         back.style.display = 'none';
         front.style.display = '';
-        // Restore dynamic height when returning to front
-        card.style.height = '';
-        back.style.height = '';
       }
       card.style.transition = 'transform 0.13s ease-out';
       card.style.transform = 'scaleX(1)';
