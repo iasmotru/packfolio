@@ -776,7 +776,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 /* Инпут тегов внутри карточки — того же размера, что и select-card */
 .doc-card-back-face .form-input {
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: 16px; /* ≥16px prevents iOS auto-zoom on focus */
   margin-top: 0 !important;
 }
 
@@ -837,7 +837,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   height: 32px;
   margin-top: 4px;
   padding: 0 8px;
-  font-size: 13px;
+  font-size: 16px; /* ≥16px prevents iOS auto-zoom on focus */
   font-family: 'Onest', sans-serif;
   background: var(--bg-input);
   border: 1.5px solid var(--border);
