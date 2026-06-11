@@ -873,6 +873,15 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   background: rgba(70, 77, 245, 0.05);
 }
 
+/* Title-инпут в хедере карточки — растягивается на доступную ширину */
+.card-title-input {
+  flex: 1;
+  margin-top: 0;
+  font-size: 15px;
+  font-weight: 600;
+  height: 34px;
+}
+
 .doc-type-badge {
   width: 44px;
   height: 44px;
