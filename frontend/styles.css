@@ -1045,6 +1045,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   max-height: 92dvh;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
   animation: slideUp .28s cubic-bezier(0.32, 0.72, 0, 1);
   border-top: 1px solid var(--border);
   border-left: 1px solid var(--border);
