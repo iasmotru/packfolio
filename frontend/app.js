@@ -1585,6 +1585,8 @@ function buildDocMiniCard(doc, showAllFields = false) {
     if (bottomNav) bottomNav.style.display = '';
     const fab = document.querySelector('#fab');
     if (fab) fab.style.display = '';
+    // Закрываем любые открытые пикеры дат/времени
+    document.querySelectorAll('.datepicker-popup, .timepicker-popup').forEach(p => p.remove());
     const newData = doc.widget?.data || {};
     fieldRefs.forEach(({ key, item, valueEl }) => {
       item.onclick = null;
