@@ -156,17 +156,18 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   width: 312px;
   height: 64px;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   background: rgba(70, 77, 245, 0.2);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: var(--radius-xl);
   border: 1px solid rgba(70, 77, 245, 0.25);
-  padding: 12px 20px;
-  gap: 16px;
+  padding: 0;
+  gap: 0;
   box-shadow: var(--shadow);
   pointer-events: all;
   position: relative;
+  overflow: hidden;
 }
 
 /* Плавающее выделение активного таба */
@@ -182,7 +183,8 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
 }
 
 .nav-btn {
-  flex: 1;
+  flex: 0 0 25%;
+  width: 25%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -195,8 +197,8 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   font-size: 10px;
   font-weight: 500;
   font-family: 'Onest', sans-serif;
-  padding: 4px 6px;
-  border-radius: var(--radius-xs);
+  padding: 8px 4px;
+  border-radius: 0;
   transition: color .15s, background .15s;
 }
 
