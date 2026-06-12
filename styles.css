@@ -1,6 +1,6 @@
 /* ========================================================
-   Packfolio — точные токены из Figma (Диплом / UI-kit)
-   Font: Onest | Accent: #464DF5 | Bg: #04121D
+   Packfolio — монохромная тёмная тема (Apple Dark)
+   Font: Onest | Accent: #0A84FF | Bg: #000000
    ======================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap');
@@ -8,34 +8,33 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* ── Фоны (из Figma: Bg Dark → Secondary → Tertiary) ── */
-  --bg:            #04121D;
-  --bg-card:       #0F1B40;
-  --bg-elevated:   #1D296F;
-  --bg-input:      rgba(255,255,255,0.06);
+  /* ── Фоны — Apple system gray scale ── */
+  --bg:            #000000;
+  --bg-card:       #1C1C1E;
+  --bg-elevated:   #2C2C2E;
+  --bg-input:      rgba(255,255,255,0.07);
   --border:        rgba(255,255,255,0.10);
-  --border-strong: rgba(255,255,255,0.20);
+  --border-strong: rgba(255,255,255,0.18);
 
   /* ── Текст ── */
   --text:          #FFFFFF;
-  --text-secondary:#ABABAB;
-  --text-hint:     #898D91;
+  --text-secondary:rgba(235,235,245,0.6);
+  --text-hint:     rgba(235,235,245,0.3);
   --text-off:      #EFEFEF;
 
-  /* ── Акценты (из Figma) ── */
-  --accent:        #464DF5;
-  --accent-dim:    rgba(70,77,245,0.15);
-  --accent-hover:  #5560F7;
-  --accent-teal:   #92E89A;
+  /* ── Акценты — Apple Blue ── */
+  --accent:        #0A84FF;
+  --accent-dim:    rgba(10,132,255,0.15);
+  --accent-hover:  #409CFF;
+  --accent-teal:   #30D158;
 
-  /* ── Градиенты (из Figma) ── */
-  /* Accent Blue linear */
-  --grad-accent: linear-gradient(135deg, #464DF5 0%, #1D296F 100%);
-  /* Radial для виджетов / фоновых карточек */
+  /* ── Градиенты ── */
+  --grad-accent: linear-gradient(135deg, #0A84FF 0%, #2C2C2E 100%);
+  /* Серый радиальный для карточек поездок */
   --grad-radial:  radial-gradient(circle at 70% 110%,
-                    #464DF5 0%, #1D296F 27%, #0F1B40 52%, #04121D 76%);
+                    #3A3A3C 0%, #2C2C2E 35%, #1C1C1E 65%, #111111 100%);
   --grad-radial-dim: radial-gradient(circle at 70% 110%,
-                    rgba(70,77,245,0.7) 0%, #1D296F 27%, #0F1B40 52%, #04121D 76%);
+                    #2C2C2E 0%, #1C1C1E 50%, #111111 100%);
 
   /* ── Типы документов ── */
   --c-flight:      #60A5FA;
@@ -60,7 +59,7 @@
 
   --shadow:      0 8px 32px rgba(0,0,0,0.5);
   --shadow-sm:   0 4px 16px rgba(0,0,0,0.4);
-  --shadow-accent: 0 8px 24px rgba(70,77,245,0.4);
+  --shadow-accent: 0 8px 24px rgba(10,132,255,0.4);
 }
 
 /* ──────────────────────────────────────────────
@@ -157,11 +156,11 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   height: 64px;
   display: flex;
   align-items: stretch;
-  background: rgba(70, 77, 245, 0.2);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(28,28,30,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(70, 77, 245, 0.25);
+  border: 1px solid rgba(255,255,255,0.1);
   padding: 0;
   gap: 0;
   box-shadow: var(--shadow);
@@ -175,7 +174,7 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   position: absolute;
   top: 0;
   height: 100%;
-  background: rgba(70, 77, 245, 0.35);
+  background: rgba(10,132,255,0.3);
   border-radius: var(--radius-xl);
   pointer-events: none;
   transition: left 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), width 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
@@ -274,7 +273,7 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
 
 .btn:active { opacity: .8; transform: scale(.97); }
 
-/* Primary: fill #464DF5, text #FFFFFF */
+/* Primary: fill #0A84FF, text #FFFFFF */
 .btn-primary {
   background: var(--accent);
   color: #fff;
@@ -325,7 +324,7 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   font-weight: 700;
   letter-spacing: .4px;
   text-transform: uppercase;
-  background: #464DF5;
+  background: #0A84FF;
   color: #fff;
   border-radius: 4px;
   padding: 1px 5px;
@@ -361,7 +360,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 
 .pro-plan.active {
   border-color: var(--accent);
-  background: rgba(70, 77, 245, 0.1);
+  background: var(--accent-dim);
 }
 
 .pro-plan-name {
@@ -406,7 +405,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   padding: 24px 16px 52px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  background: rgba(4, 18, 29, 0.75);
+  background: rgba(0,0,0,0.75);
   mask-image: linear-gradient(to bottom, black 72%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black 72%, transparent 100%);
   display: flex;
@@ -452,10 +451,10 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   flex: 1;
   height: 40px;
   box-sizing: border-box;
-  background: rgba(70, 77, 245, 0.15);
+  background: rgba(255,255,255,0.07);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(70, 77, 245, 0.25);
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: var(--radius);
   padding: 0 12px 0 34px;
   font-size: 16px;
@@ -881,8 +880,8 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   height: 28px;
   padding: 0 10px;
   border-radius: 8px;
-  background: rgba(70, 77, 245, 0.12);
-  border: 1px solid rgba(70, 77, 245, 0.25);
+  background: rgba(10,132,255,0.12);
+  border: 1px solid rgba(10,132,255,0.25);
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
@@ -916,7 +915,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 .card-edit-input:focus {
   border-color: var(--accent);
-  background: rgba(70, 77, 245, 0.05);
+  background: rgba(10,132,255,0.05);
 }
 
 /* Title-инпут в хедере карточки — растягивается на доступную ширину */
@@ -1024,9 +1023,9 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   font-weight: 500;
   padding: 4px 12px;
   border-radius: var(--radius-xl);
-  background: rgba(70,77,245,0.12);
+  background: rgba(10,132,255,0.12);
   color: var(--accent);
-  border: 1px solid rgba(70,77,245,0.25);
+  border: 1px solid rgba(10,132,255,0.25);
 }
 
 .tag-pill-trip {
@@ -1067,7 +1066,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   border-radius: var(--radius-lg);
   padding: 20px 16px;
   margin: 0 var(--gap);
-  border: 1px solid rgba(70,77,245,0.3);
+  border: 1px solid var(--border);
   box-shadow: var(--shadow);
 }
 
@@ -1078,7 +1077,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(4,18,29,0.75);
+  background: rgba(0,0,0,0.6);
   z-index: 100;
   display: flex;
   align-items: flex-end;
@@ -1210,7 +1209,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 .form-input:focus,
 .form-select:focus,
-.form-textarea:focus { border-color: var(--accent); background: rgba(70,77,245,0.05); }
+.form-textarea:focus { border-color: var(--accent); background: rgba(10,132,255,0.05); }
 .form-input::placeholder,
 .form-textarea::placeholder { color: var(--text-hint); }
 .form-textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
@@ -1328,8 +1327,8 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 .widget-field-val.empty { color: var(--text-hint); font-style: italic; font-size: 14px; }
 
 .widget-field-edit {
-  background: rgba(70,77,245,0.1);
-  border: 1px solid rgba(70,77,245,0.25);
+  background: rgba(10,132,255,0.1);
+  border: 1px solid rgba(10,132,255,0.25);
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
@@ -1452,7 +1451,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   gap: 5px;
   padding: 6px 12px;
   background: var(--accent-dim);
-  border: 1px solid rgba(70,77,245,0.3);
+  border: 1px solid rgba(10,132,255,0.3);
   border-radius: var(--radius-xl);
   font-size: 12px;
   font-weight: 500;
@@ -1571,7 +1570,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   bottom: 4px;
   left: 0;
   right: 0;
-  background: rgba(70,77,245,0.35);
+  background: rgba(10,132,255,0.3);
   z-index: 0;
 }
 .cal-cell.trip-start::before { left: 50%; border-radius: 8px 0 0 8px; }
@@ -1997,7 +1996,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   font-weight: 600;
   color: var(--accent);
   background: var(--accent-dim);
-  border: 1px solid rgba(70,77,245,0.25);
+  border: 1px solid rgba(10,132,255,0.25);
   border-radius: 20px;
   padding: 2px 8px;
   white-space: nowrap;
