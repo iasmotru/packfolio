@@ -1,6 +1,6 @@
 /* ========================================================
    Packfolio — монохромная тёмная тема (Apple Dark)
-   Font: Onest | Accent: #0A84FF | Bg: #000000
+   Font: Onest | Accent: #464DF5 | Bg: #000000
    ======================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap');
@@ -23,13 +23,13 @@
   --text-off:      #EFEFEF;
 
   /* ── Акценты — Apple Blue ── */
-  --accent:        #0A84FF;
-  --accent-dim:    rgba(10,132,255,0.15);
-  --accent-hover:  #409CFF;
+  --accent:        #464DF5;
+  --accent-dim:    rgba(70,77,245,0.15);
+  --accent-hover:  #5560F7;
   --accent-teal:   #30D158;
 
   /* ── Градиенты ── */
-  --grad-accent: linear-gradient(135deg, #0A84FF 0%, #2C2C2E 100%);
+  --grad-accent: linear-gradient(135deg, #464DF5 0%, #2C2C2E 100%);
   /* Серый радиальный для карточек поездок */
   --grad-radial:  radial-gradient(circle at 70% 110%,
                     #3A3A3C 0%, #2C2C2E 35%, #1C1C1E 65%, #111111 100%);
@@ -59,7 +59,7 @@
 
   --shadow:      0 8px 32px rgba(0,0,0,0.5);
   --shadow-sm:   0 4px 16px rgba(0,0,0,0.4);
-  --shadow-accent: 0 8px 24px rgba(10,132,255,0.4);
+  --shadow-accent: 0 8px 24px rgba(70,77,245,0.4);
 }
 
 /* ──────────────────────────────────────────────
@@ -174,7 +174,7 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   position: absolute;
   top: 0;
   height: 100%;
-  background: rgba(10,132,255,0.3);
+  background: rgba(70,77,245,0.3);
   border-radius: var(--radius-xl);
   pointer-events: none;
   transition: left 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), width 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
@@ -273,7 +273,7 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
 
 .btn:active { opacity: .8; transform: scale(.97); }
 
-/* Primary: fill #0A84FF, text #FFFFFF */
+/* Primary: fill #464DF5, text #FFFFFF */
 .btn-primary {
   background: var(--accent);
   color: #fff;
@@ -324,7 +324,7 @@ body.has-fab .page { padding-bottom: calc(var(--nav-h) + 48px + 16px); }
   font-weight: 700;
   letter-spacing: .4px;
   text-transform: uppercase;
-  background: #0A84FF;
+  background: #464DF5;
   color: #fff;
   border-radius: 4px;
   padding: 1px 5px;
@@ -880,8 +880,8 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   height: 28px;
   padding: 0 10px;
   border-radius: 8px;
-  background: rgba(10,132,255,0.12);
-  border: 1px solid rgba(10,132,255,0.25);
+  background: rgba(70,77,245,0.12);
+  border: 1px solid rgba(70,77,245,0.25);
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
@@ -915,7 +915,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 .card-edit-input:focus {
   border-color: var(--accent);
-  background: rgba(10,132,255,0.05);
+  background: rgba(70,77,245,0.05);
 }
 
 /* Title-инпут в хедере карточки — растягивается на доступную ширину */
@@ -1023,9 +1023,9 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   font-weight: 500;
   padding: 4px 12px;
   border-radius: var(--radius-xl);
-  background: rgba(10,132,255,0.12);
+  background: rgba(70,77,245,0.12);
   color: var(--accent);
-  border: 1px solid rgba(10,132,255,0.25);
+  border: 1px solid rgba(70,77,245,0.25);
 }
 
 .tag-pill-trip {
@@ -1209,7 +1209,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 .form-input:focus,
 .form-select:focus,
-.form-textarea:focus { border-color: var(--accent); background: rgba(10,132,255,0.05); }
+.form-textarea:focus { border-color: var(--accent); background: rgba(70,77,245,0.05); }
 .form-input::placeholder,
 .form-textarea::placeholder { color: var(--text-hint); }
 .form-textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
@@ -1327,8 +1327,8 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 .widget-field-val.empty { color: var(--text-hint); font-style: italic; font-size: 14px; }
 
 .widget-field-edit {
-  background: rgba(10,132,255,0.1);
-  border: 1px solid rgba(10,132,255,0.25);
+  background: rgba(70,77,245,0.1);
+  border: 1px solid rgba(70,77,245,0.25);
   color: var(--accent);
   font-size: 11px;
   font-weight: 600;
@@ -1451,7 +1451,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   gap: 5px;
   padding: 6px 12px;
   background: var(--accent-dim);
-  border: 1px solid rgba(10,132,255,0.3);
+  border: 1px solid rgba(70,77,245,0.3);
   border-radius: var(--radius-xl);
   font-size: 12px;
   font-weight: 500;
@@ -1570,7 +1570,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   bottom: 4px;
   left: 0;
   right: 0;
-  background: rgba(10,132,255,0.3);
+  background: rgba(70,77,245,0.3);
   z-index: 0;
 }
 .cal-cell.trip-start::before { left: 50%; border-radius: 8px 0 0 8px; }
@@ -1996,7 +1996,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   font-weight: 600;
   color: var(--accent);
   background: var(--accent-dim);
-  border: 1px solid rgba(10,132,255,0.25);
+  border: 1px solid rgba(70,77,245,0.25);
   border-radius: 20px;
   padding: 2px 8px;
   white-space: nowrap;
