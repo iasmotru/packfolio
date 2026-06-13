@@ -23,3 +23,6 @@ backend/.env
 
 # macOS
 .DS_Store
+
+# Figma plugin (локальный, не для репо)
+figma-plugin/
