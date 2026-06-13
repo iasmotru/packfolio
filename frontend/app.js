@@ -1590,7 +1590,7 @@ function openTripForm(trip = null) {
         const hdl = r.querySelector('.location-drag-handle');
         if (content) { content.style.transition = 'transform 0.22s cubic-bezier(0.25,1,0.5,1)'; content.style.transform = ''; }
         if (del) del.style.visibility = 'hidden';
-        if (hdl) hdl.style.visibility = '';
+        if (hdl) { hdl.style.width = ''; hdl.style.padding = ''; hdl.style.overflow = ''; }
         r._revealed = false;
       });
     };
@@ -1698,13 +1698,23 @@ function openTripForm(trip = null) {
       let startX = 0, startY = 0, baseX = 0, gestureDir = null;
 
       const snapTo = (x, animate = true) => {
-        if (animate) content.style.transition = 'transform 0.22s cubic-bezier(0.25,1,0.5,1)';
-        else content.style.transition = 'none';
-        content.style.transform = x ? `translateX(${x}px)` : '';
+        const ease = 'cubic-bezier(0.25,1,0.5,1)';
+        const t = animate ? `0.22s ${ease}` : 'none';
+        content.style.transition = `transform ${t}`;
+        handle.style.transition  = `width ${t}, padding ${t}`;
+        content.style.transform  = x ? `translateX(${x}px)` : '';
         row._revealed = x < 0;
         deleteAction.style.visibility = row._revealed ? 'visible' : 'hidden';
-        // Ручка скрыта пока видна кнопка «Удалить»
-        handle.style.visibility = row._revealed ? 'hidden' : '';
+        // Схлопываем ручку чтобы не создавала зазор между строкой и кнопкой
+        if (row._revealed) {
+          handle.style.width    = '0';
+          handle.style.padding  = '0';
+          handle.style.overflow = 'hidden';
+        } else {
+          handle.style.width    = '';
+          handle.style.padding  = '';
+          handle.style.overflow = '';
+        }
       };
 
       // Закрываем свайп при тапе вне кнопки удаления
