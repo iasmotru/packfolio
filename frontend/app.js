@@ -4188,6 +4188,53 @@ function renderProfilePage() {
 }
 
 // ──────────────────────────────────────────────
+// Экран согласия на обработку персональных данных
+// ──────────────────────────────────────────────
+
+function showGdprConsent() {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'gdpr-overlay';
+
+    overlay.innerHTML = `
+      <div class="gdpr-sheet">
+        <div class="gdpr-icon">🔐</div>
+        <h2 class="gdpr-title">Согласие на обработку данных</h2>
+        <p class="gdpr-text">
+          Для работы Packfolio мы обрабатываем следующие персональные данные:
+        </p>
+        <ul class="gdpr-list">
+          <li><strong>Данные профиля Telegram</strong> — имя, фамилия, имя пользователя (@ник), идентификатор</li>
+          <li><strong>Данные из документов</strong> — персональные данные, извлечённые из загружаемых файлов: ФИО, даты, номера документов, адреса и иные сведения из паспортов, билетов, бронирований, виз и других документов</li>
+        </ul>
+        <p class="gdpr-text">
+          Данные используются исключительно для работы сервиса и не передаются третьим лицам. Вы можете отозвать согласие, удалив аккаунт в разделе «Профиль».
+        </p>
+      </div>
+    `;
+
+    const sheet = overlay.querySelector('.gdpr-sheet');
+
+    const acceptBtn = el('button', 'btn btn-primary gdpr-accept-btn', 'Принять и продолжить');
+    acceptBtn.onclick = async () => {
+      acceptBtn.disabled = true;
+      acceptBtn.textContent = '...';
+      try {
+        await API.post('/api/me/accept-gdpr', {});
+        State.user.gdpr_accepted = true;
+      } catch (_) {}
+      overlay.classList.add('gdpr-overlay--out');
+      setTimeout(() => { overlay.remove(); resolve(); }, 300);
+    };
+    sheet.appendChild(acceptBtn);
+
+    document.body.appendChild(overlay);
+    // Плавное появление
+    requestAnimationFrame(() => overlay.classList.add('gdpr-overlay--in'));
+  });
+}
+
+// ──────────────────────────────────────────────
 // Навигация
 // ──────────────────────────────────────────────
 
@@ -4236,6 +4283,11 @@ const App = {
     State.loaded = true;
     // Перерисовываем текущую вкладку с загруженными данными
     this.navigate(State.currentTab, true);
+
+    // Экран согласия на обработку данных (показываем поверх всего)
+    if (State.user && State.user.gdpr_accepted === false) {
+      await showGdprConsent();
+    }
 
     // Обрабатываем ожидающий инвайт
     if (State.pendingInviteToken) {

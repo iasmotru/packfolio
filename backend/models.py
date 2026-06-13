@@ -56,13 +56,14 @@ class TagKind(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id         = Column(Integer, primary_key=True)   # telegram_id
-    first_name = Column(String(128), nullable=False)
-    last_name  = Column(String(128), nullable=True)
-    username   = Column(String(128), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    is_pro     = Column(Boolean, default=False, nullable=False, server_default="0")
-    pro_until  = Column(DateTime, nullable=True)
+    id               = Column(Integer, primary_key=True)   # telegram_id
+    first_name       = Column(String(128), nullable=False)
+    last_name        = Column(String(128), nullable=True)
+    username         = Column(String(128), nullable=True)
+    created_at       = Column(DateTime, default=datetime.utcnow)
+    is_pro           = Column(Boolean, default=False, nullable=False, server_default="0")
+    pro_until        = Column(DateTime, nullable=True)
+    gdpr_accepted_at = Column(DateTime, nullable=True)
 
     trips     = relationship("Trip",     back_populates="user", cascade="all, delete")
     tags      = relationship("Tag",      back_populates="user", cascade="all, delete")

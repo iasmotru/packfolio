@@ -86,6 +86,9 @@ def on_startup():
         if "pro_until" not in existing:
             conn.execute(text("ALTER TABLE users ADD COLUMN pro_until DATETIME"))
             conn.commit()
+        if "gdpr_accepted_at" not in existing:
+            conn.execute(text("ALTER TABLE users ADD COLUMN gdpr_accepted_at DATETIME"))
+            conn.commit()
     with _engine.connect() as conn:
         trip_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(trips)")).fetchall()]
         if "is_shared" not in trip_cols:
@@ -168,8 +171,9 @@ def auth_telegram(body: AuthRequest, db: Session = Depends(get_db)):
             "last_name":  user.last_name,
             "username":   user.username,
             "photo_url":  user_data.get("photo_url"),   # из Telegram initData
-            "is_pro":     bool(user.is_pro),
-            "pro_until":  user.pro_until.isoformat() if user.pro_until else None,
+            "is_pro":        bool(user.is_pro),
+            "pro_until":     user.pro_until.isoformat() if user.pro_until else None,
+            "gdpr_accepted": user.gdpr_accepted_at is not None,
         },
     }
 
@@ -318,8 +322,23 @@ def get_me(
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     return {
-        "id":         user.id,
-        "first_name": user.first_name,
-        "last_name":  user.last_name,
-        "username":   user.username,
+        "id":            user.id,
+        "first_name":    user.first_name,
+        "last_name":     user.last_name,
+        "username":      user.username,
+        "gdpr_accepted": user.gdpr_accepted_at is not None,
     }
+
+
+@app.post("/api/me/accept-gdpr")
+def accept_gdpr(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if not user.gdpr_accepted_at:
+        user.gdpr_accepted_at = datetime.utcnow()
+        db.commit()
+    return {"ok": True}
