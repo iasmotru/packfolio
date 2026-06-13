@@ -2074,18 +2074,41 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   margin-bottom: 4px;
 }
 
-.share-member-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* Карточка участника */
+.share-member-card {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 8px 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.share-member-row.share-member-pending {
+.share-member-card.share-member-pending {
   opacity: 0.65;
+}
+
+/* Строка: аватар + имя + кнопка удаления */
+.share-member-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.share-member-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
 }
 
 .share-member-info {
@@ -2097,7 +2120,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 
 .share-member-name {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text);
   white-space: nowrap;
@@ -2106,7 +2129,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 }
 
 .share-member-username {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-hint);
 }
 
@@ -2125,20 +2148,6 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   border-radius: var(--radius-sm);
   flex-shrink: 0;
   transition: color 0.15s;
+  align-self: flex-start;
 }
 .share-member-remove:active { color: #E53935; }
-
-/* Строка выбора роли при создании инвайта */
-.share-invite-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.share-invite-label {
-  font-size: 13px;
-  color: var(--text-hint);
-  white-space: nowrap;
-  flex-shrink: 0;
-}

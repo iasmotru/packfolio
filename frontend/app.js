@@ -1966,21 +1966,24 @@ async function openShareModal(trip) {
         }
 
         accepted.forEach(m => {
-          const row = el('div', 'share-member-row');
-          row.innerHTML = `
-            <div class="share-member-info">
-              <span class="share-member-name">${escHtml(m.member_name || m.member_username || 'Пользователь')}</span>
-              ${m.member_username ? `<span class="share-member-username">@${escHtml(m.member_username)}</span>` : ''}
-            </div>`;
-          const roleSelect = el('select', 'select-card share-role-select');
-          roleSelect.innerHTML = `<option value="reader" ${m.role==='reader'?'selected':''}>Читатель</option>
-                                  <option value="editor" ${m.role==='editor'?'selected':''}>Редактор</option>`;
-          roleSelect.onchange = async () => {
-            try {
-              await API.patch(`/api/trips/${trip.id}/members/${m.share_id}`, { role: roleSelect.value });
-              showToast('Роль обновлена');
-            } catch (e) { showToast('Ошибка: ' + e.message); }
-          };
+          const card = el('div', 'share-member-card');
+
+          // Верхняя строка: аватар + имя/ник + кнопка удаления
+          const topRow = el('div', 'share-member-top');
+
+          const avatar = el('div', 'share-member-avatar');
+          const initial = (m.member_name || m.member_username || '?')[0].toUpperCase();
+          avatar.textContent = initial;
+          topRow.appendChild(avatar);
+
+          const info = el('div', 'share-member-info');
+          const nameEl = el('div', 'share-member-name', escHtml(m.member_name || m.member_username || 'Пользователь'));
+          info.appendChild(nameEl);
+          if (m.member_username) {
+            info.appendChild(el('div', 'share-member-username', `@${escHtml(m.member_username)}`));
+          }
+          topRow.appendChild(info);
+
           const removeBtn = el('button', 'share-member-remove', '');
           removeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none">
             <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -1994,9 +1997,23 @@ async function openShareModal(trip) {
               loadMembers();
             } catch (e) { showToast('Ошибка: ' + e.message); }
           };
-          row.appendChild(roleSelect);
-          row.appendChild(removeBtn);
-          membersList.appendChild(row);
+          topRow.appendChild(removeBtn);
+          card.appendChild(topRow);
+
+          // Дропдаун роли — полная ширина под строкой с именем
+          const roleSelect = el('select', 'select-card share-role-select');
+          roleSelect.style.width = '100%';
+          roleSelect.innerHTML = `<option value="reader" ${m.role==='reader'?'selected':''}>Читатель — только просмотр</option>
+                                  <option value="editor" ${m.role==='editor'?'selected':''}>Редактор — добавление и изменение</option>`;
+          roleSelect.onchange = async () => {
+            try {
+              await API.patch(`/api/trips/${trip.id}/members/${m.share_id}`, { role: roleSelect.value });
+              showToast('Роль обновлена');
+            } catch (e) { showToast('Ошибка: ' + e.message); }
+          };
+          card.appendChild(roleSelect);
+
+          membersList.appendChild(card);
         });
 
         // Ожидающие инвайты
@@ -2050,14 +2067,11 @@ async function openShareModal(trip) {
     const inviteTitle = el('div', 'section-title', 'Пригласить');
     body.appendChild(inviteTitle);
 
-    const roleRow = el('div', 'share-invite-row');
-    const roleLabel = el('span', 'share-invite-label', 'Роль');
     const roleSelect = el('select', 'select-card');
+    roleSelect.style.width = '100%';
     roleSelect.innerHTML = `<option value="reader">Читатель — только просмотр</option>
                             <option value="editor">Редактор — добавление и изменение</option>`;
-    roleRow.appendChild(roleLabel);
-    roleRow.appendChild(roleSelect);
-    body.appendChild(roleRow);
+    body.appendChild(roleSelect);
 
     const createBtn = el('button', 'btn btn-primary', '');
     createBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Создать ссылку`;
@@ -2077,7 +2091,7 @@ async function openShareModal(trip) {
     body.appendChild(createBtn);
 
     sheet.appendChild(body);
-  }, { full: true });
+  });
 }
 
 async function handleInvite(token) {
