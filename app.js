@@ -1743,7 +1743,10 @@ function openTripForm(trip = null) {
         if (gestureDir !== 'h') return;
         const newX = Math.max(-REVEAL, Math.min(0, baseX + dx));
         content.style.transform = `translateX(${newX}px)`;
-        if (newX < 0) deleteAction.style.visibility = 'visible';
+        if (newX < 0) {
+          deleteAction.style.visibility = 'visible';
+          handle.style.opacity = '0';
+        }
       }, { passive: true });
 
       row.addEventListener('touchend', e => {
