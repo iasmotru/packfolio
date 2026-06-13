@@ -1590,7 +1590,7 @@ function openTripForm(trip = null) {
         const hdl = r.querySelector('.location-drag-handle');
         if (content) { content.style.transition = 'transform 0.22s cubic-bezier(0.25,1,0.5,1)'; content.style.transform = ''; }
         if (del) del.style.visibility = 'hidden';
-        if (hdl) { hdl.style.width = ''; hdl.style.padding = ''; hdl.style.overflow = ''; }
+        if (hdl) { hdl.style.width = ''; hdl.style.padding = ''; hdl.style.overflow = ''; hdl.style.opacity = ''; }
         r._revealed = false;
       });
     };
@@ -1707,13 +1707,15 @@ function openTripForm(trip = null) {
         deleteAction.style.visibility = row._revealed ? 'visible' : 'hidden';
         // Схлопываем ручку чтобы не создавала зазор между строкой и кнопкой
         if (row._revealed) {
-          handle.style.width    = '4px';
+          handle.style.width    = '8px';
           handle.style.padding  = '0';
           handle.style.overflow = 'hidden';
+          handle.style.opacity  = '0';
         } else {
           handle.style.width    = '';
           handle.style.padding  = '';
           handle.style.overflow = '';
+          handle.style.opacity  = '';
         }
       };
 
