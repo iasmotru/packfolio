@@ -811,7 +811,8 @@ function createDatePicker(anchorEl, onSelect) {
 
   const destroy = () => {
     document.removeEventListener('mousedown', onOutside);
-    document.removeEventListener('touchend', onOutside);
+    document.removeEventListener('touchstart', onOutside);
+    anchorEl.classList.remove('is-picker-active');
     popup.remove();
   };
 
@@ -825,11 +826,12 @@ function createDatePicker(anchorEl, onSelect) {
   render();
   document.body.appendChild(popup);
   position();
+  anchorEl.classList.add('is-picker-active');
 
-  // Регистрируем с задержкой, чтобы открывающий тап не закрыл пикер сразу
+  // touchstart надёжнее touchend на iOS — стреляет раньше фокуса нового элемента
   setTimeout(() => {
     document.addEventListener('mousedown', onOutside);
-    document.addEventListener('touchend', onOutside);
+    document.addEventListener('touchstart', onOutside, { passive: true });
   }, 80);
 
   return { destroy, highlight: (isoDate) => { selDate = isoDate; render(); } };
@@ -1007,7 +1009,26 @@ function createTimePicker(anchorEl, initialTime, onSelect) {
   }
 
   document.body.appendChild(popup);
-  const destroy = () => popup.remove();
+  anchorEl.classList.add('is-picker-active');
+
+  const destroy = () => {
+    document.removeEventListener('mousedown', onOutside);
+    document.removeEventListener('touchstart', onOutside);
+    anchorEl.classList.remove('is-picker-active');
+    popup.remove();
+  };
+
+  const onOutside = (e) => {
+    if (!popup.contains(e.target) && e.target !== anchorEl) {
+      destroy();
+    }
+  };
+
+  setTimeout(() => {
+    document.addEventListener('mousedown', onOutside);
+    document.addEventListener('touchstart', onOutside, { passive: true });
+  }, 80);
+
   return { destroy };
 }
 
@@ -1032,7 +1053,12 @@ function applyDatetimeMask(input) {
   let suppressBlur = false;
 
   input.addEventListener('focus', () => {
-    if (picker) return;
+    if (picker) {
+      // Повторный тап: закрываем пикер, даём клавиатуре открыться
+      picker.destroy();
+      picker = null;
+      return;
+    }
     picker = createDatePicker(input, isoDate => {
       const [y, mo, d] = isoDate.split('-');
       const datePart = `${d}.${mo}.${y.slice(-2)}`;
