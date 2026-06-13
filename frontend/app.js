@@ -171,22 +171,23 @@ function wrapSwipeDelete(card, doc, afterDelete) {
   wrap.appendChild(deleteAction);
   wrap.appendChild(card);
 
-  const REVEAL = 80;
+  const REVEAL = 88; // 80px кнопка + 8px зазор
+  const SWIPE_ZONE = 80; // свайп только с правых 80px карточки
   let startX = 0, startY = 0, baseX = 0, gestureDir = null, revealed = false;
 
   const snapTo = (x, animate = true) => {
     if (animate) card.style.transition = 'transform 0.22s cubic-bezier(0.25,1,0.5,1)';
     card.style.transform = `translateX(${x}px)`;
     revealed = x < 0;
-    // Кнопка видна только когда карточка сдвинута влево
     deleteAction.style.visibility = revealed ? 'visible' : 'hidden';
-    // Класс для блокировки переворота пока кнопка открыта
     card.classList.toggle('swipe-revealed', revealed);
   };
 
   card.addEventListener('touchstart', e => {
-    // Не свайпаем когда карточка перевёрнута
     if (card.classList.contains('is-flipped')) return;
+    const touchX = e.touches[0].clientX;
+    // Разрешаем новый свайп только с правого края; если уже открыто — разрешаем отовсюду
+    if (!revealed && touchX < card.getBoundingClientRect().right - SWIPE_ZONE) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     baseX  = revealed ? -REVEAL : 0;
