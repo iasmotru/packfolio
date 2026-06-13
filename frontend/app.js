@@ -4185,6 +4185,36 @@ function renderProfilePage() {
   }
 
   c.appendChild(proCard);
+
+  // ── Удалить профиль ──────────────────────────────────────────────
+  const deleteLabel = el('div', 'profile-section-label', 'Аккаунт');
+  c.appendChild(deleteLabel);
+
+  const deleteCard = el('div', 'profile-card');
+  const deleteBtn = el('button', 'btn btn-danger btn-full', '🗑 Удалить профиль');
+  deleteBtn.onclick = () => {
+    showConfirmModal({
+      title: 'Все ваши поездки и документы будут удалены, а приглашённые пользователи утратят доступ к совместным поездкам. Вы уверены, что хотите удалить профиль?',
+      confirmLabel: 'Удалить',
+      confirmClass: 'btn-danger',
+      onConfirm: async () => {
+        try {
+          await API.delete('/api/me');
+          State.token = null;
+          State.user  = null;
+          State.trips     = [];
+          State.documents = [];
+          // Перезагружаем приложение — сервер создаст нового пользователя,
+          // GDPR-согласие появится снова
+          window.location.reload();
+        } catch (e) {
+          showToast('Ошибка: ' + e.message);
+        }
+      },
+    });
+  };
+  deleteCard.appendChild(deleteBtn);
+  c.appendChild(deleteCard);
 }
 
 // ──────────────────────────────────────────────

@@ -26,7 +26,7 @@ from auth import (
     validate_telegram_init_data, validate_init_data_dev,
 )
 from models import (
-    Document, DocumentTag, Tag, Trip, User, WidgetData,
+    Document, DocumentTag, Tag, Trip, TripShare, User, WidgetData,
     create_tables, get_db,
 )
 from routes import calendar, documents, sharing, tags, trips, wallet_routes
@@ -328,6 +328,24 @@ def get_me(
         "username":      user.username,
         "gdpr_accepted": user.gdpr_accepted_at is not None,
     }
+
+
+@app.delete("/api/me", status_code=204)
+def delete_me(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Удаляет пользователя и все его данные (поездки, документы, теги, шеры)."""
+    # Удаляем TripShare, где пользователь — участник (не владелец)
+    db.query(TripShare).filter(TripShare.member_id == user_id).delete()
+    # Удаляем TripShare, где пользователь — владелец (включая pending)
+    db.query(TripShare).filter(TripShare.owner_id == user_id).delete()
+    db.flush()
+    # Удаляем самого пользователя — каскад удалит trips, documents, tags
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        db.delete(user)
+    db.commit()
 
 
 @app.post("/api/me/accept-gdpr")
