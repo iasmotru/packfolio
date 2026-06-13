@@ -1418,7 +1418,7 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
   font-weight: 600;
   cursor: pointer;
   visibility: hidden;
-  border-radius: 0 var(--radius) var(--radius) 0;
+  border-radius: var(--radius);
   user-select: none;
 }
 
