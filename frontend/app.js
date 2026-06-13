@@ -1707,7 +1707,7 @@ function openTripForm(trip = null) {
         deleteAction.style.visibility = row._revealed ? 'visible' : 'hidden';
         // Схлопываем ручку чтобы не создавала зазор между строкой и кнопкой
         if (row._revealed) {
-          handle.style.width    = '0';
+          handle.style.width    = '4px';
           handle.style.padding  = '0';
           handle.style.overflow = 'hidden';
         } else {
