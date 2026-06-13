@@ -20,14 +20,14 @@ TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
 TELEGRAM_APP_NAME    = os.getenv("TELEGRAM_APP_NAME", "")
 
 
-# ─── Уведомление владельцу ────────────────────────────────────────────────────
+# ─── Уведомления ──────────────────────────────────────────────────────────────
 
-async def _notify_owner(owner_id: int, member_name: str, trip_title: str):
-    if not BOT_TOKEN:
+def _send_tg(chat_id: int, text: str):
+    """Синхронная отправка сообщения через Telegram Bot API."""
+    if not BOT_TOKEN or not chat_id:
         return
     import urllib.request, json as _json
-    text = f"✅ {member_name} принял приглашение в поездку «{trip_title}»"
-    payload = _json.dumps({"chat_id": owner_id, "text": text}).encode()
+    payload = _json.dumps({"chat_id": chat_id, "text": text}).encode()
     req = urllib.request.Request(
         f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
         data=payload,
@@ -38,6 +38,14 @@ async def _notify_owner(owner_id: int, member_name: str, trip_title: str):
         urllib.request.urlopen(req, timeout=5)
     except Exception:
         pass
+
+
+async def _notify_owner(owner_id: int, member_name: str, trip_title: str):
+    _send_tg(owner_id, f"✅ {member_name} принял приглашение в поездку «{trip_title}»")
+
+
+async def _notify_removed_member(member_id: int, owner_name: str, trip_title: str):
+    _send_tg(member_id, f"❌ {owner_name} удалил(а) вас из поездки «{trip_title}»")
 
 
 # ─── POST /api/trips/{trip_id}/invites ───────────────────────────────────────
@@ -134,7 +142,7 @@ def update_member_role(
 # ─── DELETE /api/trips/{trip_id}/members/{share_id} ──────────────────────────
 
 @router.delete("/api/trips/{trip_id}/members/{share_id}", status_code=204)
-def remove_member(
+async def remove_member(
     trip_id: int,
     share_id: int,
     user_id: int = Depends(get_current_user_id),
@@ -148,6 +156,11 @@ def remove_member(
     ).first()
     if not share:
         raise HTTPException(404, "Участник не найден")
+
+    # Сохраняем данные до удаления, чтобы отправить уведомление
+    removed_member_id = share.member_id
+    was_accepted = share.accepted
+
     db.delete(share)
     # Если больше нет принятых шеров — сбрасываем is_shared
     remaining = db.query(TripShare).filter(
@@ -159,6 +172,12 @@ def remove_member(
         if trip:
             trip.is_shared = False
     db.commit()
+
+    # Уведомляем участника (только если он уже принял приглашение)
+    if was_accepted and removed_member_id:
+        owner = db.query(User).filter(User.id == user_id).first()
+        owner_name = f"{owner.first_name} {owner.last_name or ''}".strip() if owner else "Владелец"
+        await _notify_removed_member(removed_member_id, owner_name, trip.title)
 
 
 # ─── GET /api/invites/{token} (без авторизации) ───────────────────────────────
