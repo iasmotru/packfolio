@@ -153,19 +153,26 @@ function wrapSwipeDelete(card, doc, afterDelete) {
     </svg>
     <span>Удалить</span>`;
 
-  deleteAction.onclick = async (e) => {
+  deleteAction.onclick = (e) => {
     e.stopPropagation();
-    try {
-      await API.delete(`/api/documents/${doc.id}`);
-      State.documents = State.documents.filter(d => d.id !== doc.id);
-      wrap.style.transition = 'opacity 0.2s, max-height 0.3s';
-      wrap.style.opacity = '0';
-      wrap.style.maxHeight = '0';
-      wrap.style.overflow = 'hidden';
-      setTimeout(() => wrap.remove(), 350);
-      afterDelete?.();
-      showToast('Документ удалён');
-    } catch (err) { showToast('Ошибка: ' + err.message); }
+    showConfirmModal({
+      title: 'Удалить документ?',
+      confirmLabel: 'Удалить',
+      confirmClass: 'btn-danger',
+      onConfirm: async () => {
+        try {
+          await API.delete(`/api/documents/${doc.id}`);
+          State.documents = State.documents.filter(d => d.id !== doc.id);
+          wrap.style.transition = 'opacity 0.2s, max-height 0.3s';
+          wrap.style.opacity = '0';
+          wrap.style.maxHeight = '0';
+          wrap.style.overflow = 'hidden';
+          setTimeout(() => wrap.remove(), 350);
+          afterDelete?.();
+          showToast('Документ удалён');
+        } catch (err) { showToast('Ошибка: ' + err.message); }
+      },
+    });
   };
 
   wrap.appendChild(deleteAction);
@@ -265,6 +272,35 @@ function setupSearchInput(input) {
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
   });
+}
+
+/**
+ * Кастомное окно подтверждения вместо browser confirm().
+ * showConfirmModal({ title, confirmLabel, confirmClass, onConfirm })
+ */
+function showConfirmModal({ title, confirmLabel = 'Удалить', confirmClass = 'btn-danger', onConfirm }) {
+  Modal.open(sheet => {
+    sheet.style.cssText = 'padding: 20px var(--gap) calc(16px + env(safe-area-inset-bottom,0px))';
+
+    const titleEl = el('div', '', title);
+    titleEl.style.cssText = 'font-size:17px;font-weight:500;color:var(--text);margin-bottom:20px;text-align:center;line-height:1.4';
+    sheet.appendChild(titleEl);
+
+    const btns = el('div', '');
+    btns.style.cssText = 'display:flex;gap:10px';
+
+    const cancelBtn = el('button', 'btn btn-secondary', 'Отменить');
+    cancelBtn.style.flex = '1';
+    cancelBtn.onclick = () => Modal.close();
+    btns.appendChild(cancelBtn);
+
+    const confirmBtn = el('button', `btn ${confirmClass}`, confirmLabel);
+    confirmBtn.style.flex = '1';
+    confirmBtn.onclick = () => { Modal.close(); onConfirm(); };
+    btns.appendChild(confirmBtn);
+
+    sheet.appendChild(btns);
+  }, { center: true });
 }
 
 function showToast(msg, duration = 2500) {
@@ -2560,21 +2596,27 @@ function openArchiveModal() {
 
     const clearBtn = el('button', 'archive-icon-btn');
     clearBtn.innerHTML = `<span>Очистить</span>`;
-    clearBtn.onclick = async () => {
-      if (!confirm('Удалить все документы из архива?')) return;
-      clearBtn.disabled = true;
-      try {
-        const params = new URLSearchParams();
-        let docs = await API.get(`/api/documents?${params}`);
-        if (docs) docs = docs.filter(d => isDocPast(d));
-        await Promise.all((docs || []).map(d => API.delete(`/api/documents/${d.id}`)));
-        await loadAllData();
-        loadArchive();
-      } catch (e) {
-        showToast('Ошибка при удалении');
-      } finally {
-        clearBtn.disabled = false;
-      }
+    clearBtn.onclick = () => {
+      showConfirmModal({
+        title: 'Очистить архив?',
+        confirmLabel: 'Очистить',
+        confirmClass: 'btn-danger',
+        onConfirm: async () => {
+          clearBtn.disabled = true;
+          try {
+            const params = new URLSearchParams();
+            let docs = await API.get(`/api/documents?${params}`);
+            if (docs) docs = docs.filter(d => isDocPast(d));
+            await Promise.all((docs || []).map(d => API.delete(`/api/documents/${d.id}`)));
+            await loadAllData();
+            loadArchive();
+          } catch (e) {
+            showToast('Ошибка при удалении');
+          } finally {
+            clearBtn.disabled = false;
+          }
+        },
+      });
     };
     searchRow.appendChild(clearBtn);
 
@@ -2973,12 +3015,18 @@ function renderDocDetailBody(body, doc) {
   body.appendChild(delSection);
   const delBtn = el('button', 'btn btn-danger btn-full', '🗑 Удалить документ');
   delBtn.style.margin = '0 var(--gap)';
-  delBtn.onclick = async () => {
-    if (!confirm('Удалить документ?')) return;
-    await API.delete(`/api/documents/${doc.id}`);
-    showToast('Документ удалён');
-    Modal.close();
-    await applyDocFilters();
+  delBtn.onclick = () => {
+    showConfirmModal({
+      title: 'Удалить документ?',
+      confirmLabel: 'Удалить',
+      confirmClass: 'btn-danger',
+      onConfirm: async () => {
+        await API.delete(`/api/documents/${doc.id}`);
+        showToast('Документ удалён');
+        Modal.close();
+        await applyDocFilters();
+      },
+    });
   };
   body.appendChild(delBtn);
 }
