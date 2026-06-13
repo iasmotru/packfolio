@@ -105,6 +105,15 @@ const API = {
 // ──────────────────────────────────────────────
 
 function qs(sel, root = document) { return root.querySelector(sel); }
+
+/** Русское склонение: pluralRu(6, 'документ', 'документа', 'документов') → 'документов' */
+function pluralRu(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m100 >= 11 && m100 <= 20) return many;
+  if (m10 === 1) return one;
+  if (m10 >= 2 && m10 <= 4) return few;
+  return many;
+}
 function qsa(sel, root = document) { return [...root.querySelectorAll(sel)]; }
 function el(tag, cls, html) {
   const e = document.createElement(tag);
@@ -1322,7 +1331,7 @@ function applyTripFilters(listEl) {
         <span class="trip-meta-chip">
           ${escHtml(addLocationFlags(trip.locations))}
         </span>` : ''}
-        ${docCount ? `<span class="trip-meta-chip">📄 ${docCount} доку${docCount === 1 ? 'мент' : 'мента'}</span>` : ''}
+        ${docCount ? `<span class="trip-meta-chip">📄 ${docCount} ${pluralRu(docCount, 'документ', 'документа', 'документов')}</span>` : ''}
         ${role !== 'owner' ? `<span class="trip-meta-chip">👥 ${escHtml(trip.user_id !== State.user?.id ? 'Совместная' : 'Совместная')}</span>` : ''}
       </div>
       ${trip.note ? `<div class="trip-card-note">${escHtml(trip.note)}</div>` : ''}
@@ -1572,12 +1581,34 @@ function openTripForm(trip = null) {
       ? trip.locations.split(/\s*→\s*/).map(s => s.trim()).filter(Boolean)
       : [''];
 
+    // Сбрасывает все открытые свайп-удаления в списке городов
+    const closeAllSwipes = (except) => {
+      locList.querySelectorAll('.location-row').forEach(r => {
+        if (r === except) return;
+        const content = r.querySelector('.location-row-content');
+        const del = r.querySelector('.location-row-delete');
+        if (content) { content.style.transition = 'transform 0.22s cubic-bezier(0.25,1,0.5,1)'; content.style.transform = ''; }
+        if (del) del.style.visibility = 'hidden';
+        r._revealed = false;
+      });
+    };
+
     const addCityRow = (value = '') => {
       const row = el('div', 'location-row');
-      row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;position:relative';
+      row._revealed = false;
+
+      // Красная кнопка удаления (появляется справа при свайпе)
+      const deleteAction = el('div', 'location-row-delete');
+      deleteAction.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg><span>Удалить</span>`;
+      row.appendChild(deleteAction);
+
+      // Содержимое строки (скользит влево при свайпе)
+      const content = el('div', 'location-row-content');
 
       const wrap = el('div', 'location-autocomplete');
-      wrap.style.flex = '1';
       const input = el('input', 'form-input');
       input.placeholder = 'Начните вводить город...';
       input.autocomplete = 'off';
@@ -1587,35 +1618,136 @@ function openTripForm(trip = null) {
       wrap.appendChild(input);
       wrap.appendChild(dropdown);
       initLocationAutocomplete(input, dropdown);
-      row.appendChild(wrap);
+      content.appendChild(wrap);
 
-      const updateButtons = () => {
+      // Ручка перетаскивания
+      const handle = el('div', 'location-drag-handle');
+      handle.innerHTML = `<svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor">
+        <circle cx="4" cy="3"  r="1.5"/><circle cx="8" cy="3"  r="1.5"/>
+        <circle cx="4" cy="9"  r="1.5"/><circle cx="8" cy="9"  r="1.5"/>
+        <circle cx="4" cy="15" r="1.5"/><circle cx="8" cy="15" r="1.5"/>
+      </svg>`;
+      content.appendChild(handle);
+      row.appendChild(content);
+
+      // ── Drag-to-reorder ─────────────────────────
+      let dragClone = null, dragOffsetY = 0;
+
+      handle.addEventListener('touchstart', e => {
+        e.stopPropagation(); // не запускать свайп-удаление
+        const touch = e.touches[0];
+        const rect = row.getBoundingClientRect();
+        dragOffsetY = touch.clientY - rect.top;
+
+        dragClone = row.cloneNode(true);
+        dragClone.className = 'location-drag-clone';
+        dragClone.style.left  = rect.left  + 'px';
+        dragClone.style.top   = rect.top   + 'px';
+        dragClone.style.width = rect.width + 'px';
+        document.body.appendChild(dragClone);
+
+        row.classList.add('is-dragging');
+      }, { passive: true });
+
+      handle.addEventListener('touchmove', e => {
+        if (!dragClone) return;
+        e.preventDefault(); // блокируем скролл модала во время перетаскивания
+        const touch = e.touches[0];
+        const newTop = touch.clientY - dragOffsetY;
+        dragClone.style.top = newTop + 'px';
+
+        // Определяем позицию вставки по центру клона
+        const cloneCenter = newTop + dragClone.offsetHeight / 2;
+        const rows = [...locList.querySelectorAll('.location-row')];
+        let insertBefore = null;
+        for (const r of rows) {
+          if (r === row) continue;
+          const rc = r.getBoundingClientRect();
+          if (cloneCenter < rc.top + rc.height / 2) { insertBefore = r; break; }
+        }
+
+        if (insertBefore) {
+          locList.insertBefore(row, insertBefore);
+        } else {
+          locList.appendChild(row);
+        }
+      }, { passive: false });
+
+      const endDrag = () => {
+        if (!dragClone) return;
+        dragClone.remove();
+        dragClone = null;
+        row.classList.remove('is-dragging');
+      };
+      handle.addEventListener('touchend',   endDrag, { passive: true });
+      handle.addEventListener('touchcancel', endDrag, { passive: true });
+
+      // Автоматически добавляем следующий пустой инпут, когда пользователь начинает вводить в последнем
+      input.addEventListener('input', () => {
         const rows = locList.querySelectorAll('.location-row');
-        rows.forEach((r, i) => {
-          const addBtn = r.querySelector('.loc-add-btn');
-          const delBtn = r.querySelector('.loc-del-btn');
-          if (addBtn) addBtn.style.display = i === rows.length - 1 ? '' : 'none';
-          if (delBtn) delBtn.style.display = rows.length > 1 ? '' : 'none';
-        });
+        const lastRow = rows[rows.length - 1];
+        if (input.value.trim() && row === lastRow) {
+          addCityRow('');
+        }
+      });
+
+      // ── Свайп-удаление ──────────────────────────
+      const REVEAL = 80;
+      let startX = 0, startY = 0, baseX = 0, gestureDir = null;
+
+      const snapTo = (x, animate = true) => {
+        if (animate) content.style.transition = 'transform 0.22s cubic-bezier(0.25,1,0.5,1)';
+        else content.style.transition = 'none';
+        content.style.transform = x ? `translateX(${x}px)` : '';
+        row._revealed = x < 0;
+        deleteAction.style.visibility = row._revealed ? 'visible' : 'hidden';
       };
 
-      const delBtn = el('button', 'btn-ghost loc-del-btn');
-      delBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-      delBtn.style.cssText = 'padding:8px;flex-shrink:0;margin-top:2px';
-      delBtn.onclick = () => { row.remove(); updateButtons(); };
-      row.appendChild(delBtn);
+      row.addEventListener('touchstart', e => {
+        closeAllSwipes(row);
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        baseX = row._revealed ? -REVEAL : 0;
+        gestureDir = null;
+        content.style.transition = 'none';
+      }, { passive: true });
 
-      const addBtn = el('button', 'btn-ghost loc-add-btn');
-      addBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-      addBtn.style.cssText = 'padding:8px;flex-shrink:0;margin-top:2px';
-      addBtn.onclick = () => { addCityRow(); updateButtons(); };
-      row.appendChild(addBtn);
+      row.addEventListener('touchmove', e => {
+        const dx = e.touches[0].clientX - startX;
+        const dy = e.touches[0].clientY - startY;
+        if (!gestureDir) {
+          if (Math.abs(dx) > 5 || Math.abs(dy) > 5)
+            gestureDir = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+        }
+        if (gestureDir !== 'h') return;
+        const newX = Math.max(-REVEAL, Math.min(0, baseX + dx));
+        content.style.transform = `translateX(${newX}px)`;
+        if (newX < 0) deleteAction.style.visibility = 'visible';
+      }, { passive: true });
+
+      row.addEventListener('touchend', e => {
+        if (gestureDir !== 'h') return;
+        const dx = e.changedTouches[0].clientX - startX;
+        snapTo(baseX + dx < -REVEAL / 2 ? -REVEAL : 0);
+      }, { passive: true });
+
+      deleteAction.addEventListener('click', () => {
+        row.style.transition = 'opacity 0.2s, max-height 0.25s';
+        row.style.opacity = '0';
+        row.style.maxHeight = '0';
+        row.style.overflow = 'hidden';
+        row.style.marginBottom = '0';
+        setTimeout(() => row.remove(), 280);
+      });
 
       locList.appendChild(row);
-      updateButtons();
     };
 
     existingCities.forEach(c => addCityRow(c));
+    // При редактировании поездки с городами добавляем пустую строку для ввода нового города
+    if (existingCities.length > 0 && existingCities[existingCities.length - 1]) {
+      addCityRow('');
+    }
 
     const getLocations = () =>
       [...locList.querySelectorAll('.location-row input')]
@@ -1717,7 +1849,6 @@ function openTripDetail(trip) {
 
 async function openShareModal(trip) {
   Modal.open(sheet => {
-    sheet.classList.add('modal-full');
     sheet.appendChild(Modal.buildHeader(`👥 Доступ: ${escHtml(trip.title)}`));
 
     const body = el('div', 'modal-body');
@@ -2445,7 +2576,7 @@ function openArchiveModal() {
     // Скролл отдан самому modal-sheet, чтобы карточки проходили под sticky-хэдером
     // и backdrop-filter в хэдере работал (размывал контент позади)
     const list = el('div', 'card-list');
-    list.style.cssText = 'padding:0 16px 24px;';
+    list.style.cssText = 'padding:0 0 24px;';
     sheet.appendChild(list);
 
     const loadArchive = async () => {
@@ -3569,8 +3700,10 @@ function renderCalendarGrid(container) {
   const today = new Date();
 
   const header = el('div', 'cal-header');
-  const prevBtn = el('button', 'btn btn-icon', '‹');
-  const nextBtn = el('button', 'btn btn-icon', '›');
+  const prevBtn = el('button', 'archive-icon-btn');
+  prevBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const nextBtn = el('button', 'archive-icon-btn');
+  nextBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const label   = el('div', 'cal-month-label',
     new Date(year, month - 1, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }));
 
