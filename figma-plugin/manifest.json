@@ -1,0 +1,8 @@
+{
+  "name": "Packfolio Design System",
+  "id": "packfolio-ds-generator",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "enableProposedApi": true
+}
