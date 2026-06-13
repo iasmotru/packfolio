@@ -2043,16 +2043,17 @@ button:disabled { opacity: 1; color: var(--text-hint); border-color: var(--borde
 .trip-share-btn {
   background: none;
   border: none;
-  color: var(--text-hint);
   cursor: pointer;
   padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
-  transition: color 0.15s, background 0.15s;
+  font-size: 18px;
+  line-height: 1;
+  transition: opacity 0.15s;
 }
-.trip-share-btn:active { color: var(--accent); background: var(--accent-dim); }
+.trip-share-btn:active { opacity: 0.6; }
 
 /* Бейдж роли («читатель» / «редактор») */
 .trip-role-badge {
