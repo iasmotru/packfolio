@@ -854,7 +854,12 @@ function applyDateMask(input) {
   });
 
   input.addEventListener('focus', () => {
-    if (picker) return;
+    if (picker) {
+      // Повторный тап — закрываем календарь, показываем клавиатуру
+      picker.destroy();
+      picker = null;
+      return; // фокус остаётся → iOS откроет клавиатуру
+    }
     picker = createDatePicker(input, isoDate => {
       const [y, m, d] = isoDate.split('-');
       input.value = `${d}.${m}.${y.slice(-2)}`;
