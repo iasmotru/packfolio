@@ -1273,7 +1273,7 @@ function applyTripFilters(listEl) {
   let trips = State.trips.slice();
 
   if (type === 'personal') trips = trips.filter(t => (t.access_role || 'owner') === 'owner');
-  if (type === 'shared')   trips = trips.filter(t => (t.access_role || 'owner') !== 'owner');
+  if (type === 'shared')   trips = trips.filter(t => (t.access_role || 'owner') !== 'owner' || t.is_shared);
 
   if (q) {
     trips = trips.filter(t =>
@@ -1332,7 +1332,7 @@ function applyTripFilters(listEl) {
           ${escHtml(addLocationFlags(trip.locations))}
         </span>` : ''}
         ${docCount ? `<span class="trip-meta-chip">📄 ${docCount} ${pluralRu(docCount, 'документ', 'документа', 'документов')}</span>` : ''}
-        ${role !== 'owner' ? `<span class="trip-meta-chip">👥 ${escHtml(trip.user_id !== State.user?.id ? 'Совместная' : 'Совместная')}</span>` : ''}
+        ${(role !== 'owner' || trip.is_shared) ? `<span class="trip-meta-chip">👥 Совместная</span>` : ''}
       </div>
       ${trip.note ? `<div class="trip-card-note">${escHtml(trip.note)}</div>` : ''}
     `;
