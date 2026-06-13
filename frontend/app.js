@@ -1981,13 +1981,20 @@ async function openShareModal(trip) {
             <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>`;
-          removeBtn.onclick = async () => {
-            try {
-              await API.delete(`/api/trips/${trip.id}/members/${m.share_id}`);
-              await loadAllData();
-              showToast('Участник удалён');
-              loadMembers();
-            } catch (e) { showToast('Ошибка: ' + e.message); }
+          removeBtn.onclick = () => {
+            showConfirmModal({
+              title: 'Удалить участника из поездки?',
+              confirmLabel: 'Удалить',
+              confirmClass: 'btn-danger',
+              onConfirm: async () => {
+                try {
+                  await API.delete(`/api/trips/${trip.id}/members/${m.share_id}`);
+                  await loadAllData();
+                  showToast('Участник удалён');
+                  loadMembers();
+                } catch (e) { showToast('Ошибка: ' + e.message); }
+              }
+            });
           };
           topRow.appendChild(removeBtn);
           card.appendChild(topRow);
