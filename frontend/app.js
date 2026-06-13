@@ -2783,6 +2783,7 @@ function openDocCard(docOrId) {
       const body = el('div', 'modal-body');
       body.style.paddingTop = '8px';
       const card = buildDocMiniCard(doc, true);
+      card.style.margin = '0'; // modal-body уже даёт 16px padding
       body.appendChild(card);
       sheet.appendChild(body);
     });
