@@ -1340,7 +1340,7 @@ function applyTripFilters(listEl) {
 
   let trips = State.trips.slice();
 
-  if (type === 'personal') trips = trips.filter(t => (t.access_role || 'owner') === 'owner');
+  if (type === 'personal') trips = trips.filter(t => (t.access_role || 'owner') === 'owner' && !t.is_shared);
   if (type === 'shared')   trips = trips.filter(t => (t.access_role || 'owner') !== 'owner' || t.is_shared);
 
   if (q) {
