@@ -642,6 +642,7 @@ const WIDGET_LABELS = {
   nationality:       'Гражданство',
   date_of_birth:     'Дата рождения',
   expiry_date:       'Действует до',
+  wagon:             'Вагон',
 };
 
 // Типы полей для форматирования
@@ -1098,7 +1099,7 @@ const OPTIONAL_MINI_FIELDS = new Set(['seat','baggage','tariff','passengers']);
 const WIDGET_FIELDS = {
   HOTEL_BOOKING:      ['hotel_name','address','check_in','check_out','nights','room_type','guests'],
   FLIGHT_TICKET:      ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','baggage','tariff'],
-  TRAIN_TICKET:       ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
+  TRAIN_TICKET:       ['flight_number','wagon','seat','departure_place','departure_date','departure_time','arrival_place','arrival_date','arrival_time','passengers','tariff'],
   BUS_TICKET:         ['flight_number','pnr','departure_place','departure_date','arrival_place','arrival_date','seat','passengers','tariff'],
   // departure_time / arrival_time хранятся в data, но не показываются отдельно
   CAR_RENTAL:         ['car_model','plate','pickup_date','pickup_time','dropoff_date','dropoff_time'],

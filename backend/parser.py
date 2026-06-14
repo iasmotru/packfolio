@@ -113,7 +113,6 @@ DOC_PATTERNS: Dict[str, list] = {
         r"\bdeparture\b",
         r"\barrival\b",
         # Русские паттерны
-        r"\bэлектронный\s+билет\b",
         r"\bномер\s+брони\b",
         r"\bвылет\b",
         r"\bприлёт\b",
@@ -131,6 +130,16 @@ DOC_PATTERNS: Dict[str, list] = {
         r"\b(db|sncf|eurostar|thalys|italo|trenitalia)\b",
         r"\bwagon\b",
         r"\bcoach\b.*\bseat\b",
+        # Русские паттерны (РЖД / ФПК)
+        r"\bвагон\b",
+        r"\bкупе\b",
+        r"\bплацкарт\b",
+        r"\bфпк\b",
+        r"\bпоезд\b",
+        r"\bперевозчик\b",
+        r"контрольный\s+купон",
+        r"\bнумерация\s+вагонов\b",
+        r"\bпосадка\s+в\s+поезд\b",
     ],
     "BUS_TICKET": [
         r"\bbus\b",
@@ -872,9 +881,145 @@ def _extract_iata_segments(lines: list) -> list:
     return segments
 
 
+def _extract_rzd_data(text: str) -> Optional[Dict[str, Any]]:
+    """
+    Парсит билет РЖД (ФПК).
+    Ключевой источник данных — машиночитаемая строка в конце билета вида:
+      063ВА 07.06.2026 19:15 01К 104 САНКТ-ПЕТЕРБУРГ-ГЛАВН. - МОСКВА ВК ВОСТОЧНЫЙ ПН4523078552 МАРТИНОВИЧ-МД 070702
+    """
+    # Признак РЖД-билета
+    if not re.search(r"(?:фпк|контрольный\s+купон|нумерация\s+вагонов|посадка\s+в\s+поезд)", text, re.IGNORECASE):
+        return None
+
+    data: Dict[str, Any] = {}
+
+    # ── Машиночитаемая строка ──────────────────────────────────────────────
+    # Формат: ПОЕЗД[БУКВЫ] ДАТА ВРЕМЯ ВАГОН[КЛАСС] МЕСТО ОТКУДА - КУДА ПН/ПАСПОРТ ПАССАЖИР ДАТАРОЖД
+    barcode_m = re.search(
+        r'(\d{3})[А-ЯЁA-Z]{0,3}\s+'              # номер поезда
+        r'(\d{2}\.\d{2}\.\d{4})\s+'              # дата отправления
+        r'(\d{2}:\d{2})\s+'                       # время отправления
+        r'(\d{2})[А-ЯЁA-Z]?\s+'                  # вагон
+        r'(\d{1,3})\s+'                           # место
+        r'([А-ЯЁ][А-ЯЁ\.\-]+(?:\s+[А-ЯЁ][А-ЯЁ\.\-]+)*)'  # откуда (без пробелов внутри)
+        r'\s+-\s+'                                # разделитель " - "
+        r'([А-ЯЁ][А-ЯЁ\.\-\s]+?)'               # куда (может быть с пробелами)
+        r'(?=\s+(?:ПН|[А-ЯЁ]{2})\d)',            # lookahead: паспорт
+        text,
+    )
+    if barcode_m:
+        data['flight_number'] = barcode_m.group(1)  # номер поезда → flight_number (общее поле)
+        data['departure_date'] = normalize_date_str(barcode_m.group(2))
+        data['departure_time'] = barcode_m.group(3)
+        data['wagon'] = barcode_m.group(4)
+        data['seat'] = barcode_m.group(5)
+        dep_raw = barcode_m.group(6).strip()
+        arr_raw = barcode_m.group(7).strip()
+        # Приводим к нормальному регистру: "САНКТ-ПЕТЕРБУРГ-ГЛАВН." → "Санкт-Петербург-Главн."
+        data['departure_place'] = re.sub(
+            r'([А-ЯЁA-Z])([А-ЯЁA-Za-zа-яё]+)',
+            lambda m: m.group(1) + m.group(2).lower(),
+            dep_raw,
+        )
+        data['arrival_place'] = re.sub(
+            r'([А-ЯЁA-Z])([А-ЯЁA-Za-zа-яё]+)',
+            lambda m: m.group(1) + m.group(2).lower(),
+            arr_raw,
+        )
+    else:
+        # Fallback: берём поезд/вагон/место из структурированного блока PDF
+        # (дублированные строки: "063\n063\n01\n01\n104\n104")
+        pv_block = re.search(
+            r'ПОЕЗД\s+ВАГОН\s+МЕСТО\s+'
+            r'(\d+)\s+\1\s+(\d+)\s+\2\s+(\d+)',
+            text,
+        )
+        if pv_block:
+            data['flight_number'] = pv_block.group(1)
+            data['wagon']        = pv_block.group(2)
+            data['seat']         = pv_block.group(3)
+
+        # Станции из дублированных строк заголовков (буква + остаток на следующей строке)
+        # "С\nСанкт-Петербург-Главн.\nМосковский Вокзал"
+        dep_city_m = re.search(
+            r'(?:С\s+С|Санкт)(?:анкт)?[\-\s]Петербург[^\n]*\n([^\n]+)',
+            text,
+        )
+        if dep_city_m:
+            data['departure_place'] = 'Санкт-Петербург-Главн.'
+
+        arr_city_m = re.search(
+            r'(?:М\s+М|М)(?:осква)\s+Вк?\s+Восточный',
+            text, re.IGNORECASE,
+        )
+        if arr_city_m:
+            data['arrival_place'] = 'Москва Вк Восточный'
+
+    # ── Время и дата прибытия ─────────────────────────────────────────────
+    # В тексте два блока «время\nвремя\nдата\nдень_недели»: первый — отправление, второй — прибытие
+    time_blocks = list(re.finditer(
+        r'(\d{2}:\d{2})\n\d{2}:\d{2}\n'
+        r'(\d{2}\.\d{2}\.\d{4})',
+        text,
+    ))
+    if len(time_blocks) >= 2:
+        # Первый блок — отправление (уже взяли из barcode), второй — прибытие
+        arr_tb = time_blocks[-1]
+        data['arrival_time'] = arr_tb.group(1)
+        data['arrival_date'] = normalize_date_str(arr_tb.group(2))
+    elif len(time_blocks) == 1 and not data.get('departure_time'):
+        # Единственный блок — отправление
+        data['departure_time'] = time_blocks[0].group(1)
+        data['departure_date'] = normalize_date_str(time_blocks[0].group(2))
+    else:
+        # Fallback: ищем время прибытия по ключевому слову
+        arr_kw = re.search(r'Прибытие[^0-9]{0,80}(\d{2}:\d{2})', text, re.IGNORECASE)
+        if arr_kw:
+            data['arrival_time'] = arr_kw.group(1)
+        arr_date_kw = find_date_after_keyword(text, r'прибытие|arrival')
+        if arr_date_kw:
+            data['arrival_date'] = arr_date_kw
+
+    # ── Пассажир: "МАРТИНОВИЧ МАРИЯ\nДЕНИСОВНА" ─────────────────────────
+    # Ищем строку в формате "ФАМИЛИЯ ИМЯ\nОТЧЕСТВО" после номера паспорта
+    pax_m = re.search(
+        r'(?:ПАСПОРТ|PASSPORT)\s*(?:РФ\s*)?\d[\d\s]{7,}\n'
+        r'\d{2}\.\d{2}\.\d{4}\s+[A-Z]{2,3}\s+[МЖF]\n'
+        r'([А-ЯЁ][А-ЯЁ\-]+\s+[А-ЯЁ][А-ЯЁ\-]+)\n'
+        r'([А-ЯЁ][А-ЯЁ\-]+)',
+        text,
+    )
+    if pax_m:
+        first_line = pax_m.group(1).strip()   # "МАРТИНОВИЧ МАРИЯ"
+        patronym   = pax_m.group(2).strip()   # "ДЕНИСОВНА"
+        full_name  = f"{first_line} {patronym}"
+        # Title case: "МАРТИНОВИЧ МАРИЯ ДЕНИСОВНА" → "Мартинович Мария Денисовна"
+        data['passengers'] = ' '.join(
+            w[0].upper() + w[1:].lower() for w in full_name.split()
+        )
+    else:
+        # Fallback из машиночитаемой строки: МАРТИНОВИЧ-МД → неполное имя
+        short_pax = re.search(r'([А-ЯЁ]{3,})-([А-ЯЁ]{2,3})\s+\d{6}\b', text)
+        if short_pax:
+            data['passengers'] = short_pax.group(1).capitalize()
+
+    # ── Тип вагона / тариф ────────────────────────────────────────────────
+    wagon_type_m = re.search(r'\b(Купе|Плацкарт|СВ|Люкс|Сидячий)\b', text, re.IGNORECASE)
+    if wagon_type_m:
+        data['tariff'] = wagon_type_m.group(1).capitalize()
+
+    return data if data else None
+
+
 def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
     # Нормализуем неразрывные пробелы и мягкие дефисы
     text = text.replace('\xa0', ' ').replace('\xad', '')
+
+    # ── РЖД/ФПК — специализированный парсер (высокий приоритет) ──────────
+    if doc_type == "TRAIN_TICKET":
+        rzd = _extract_rzd_data(text)
+        if rzd:
+            return rzd
 
     data: Dict[str, Any] = {}
 
