@@ -1506,20 +1506,44 @@ function searchLocalCities(q) {
     .map(([city, country]) => ({ label: `${city}, ${country}`, value: `${city}, ${country}` }));
 }
 
-function initLocationAutocomplete(input, dropdown) {
+// Глобальный portal-дропдаун (один на всё приложение, всегда поверх всего)
+let _locationPortal = null;
+let _locationPortalOwner = null; // текущий input, которому принадлежит portal
+
+function _getLocationPortal() {
+  if (!_locationPortal) {
+    _locationPortal = document.createElement('div');
+    _locationPortal.className = 'location-dropdown';
+    _locationPortal.style.cssText = 'position:fixed;z-index:9999;display:none;';
+    document.body.appendChild(_locationPortal);
+  }
+  return _locationPortal;
+}
+
+function initLocationAutocomplete(input, _dropdownUnused) {
+  // _dropdownUnused остаётся в DOM скрытым — мы используем portal
+  const portal = _getLocationPortal();
   let abortController = null;
   let selectedFromList = false;
 
+  const updatePortalPos = () => {
+    const r = input.getBoundingClientRect();
+    portal.style.top   = (r.bottom + 4) + 'px';
+    portal.style.left  = r.left + 'px';
+    portal.style.width = r.width + 'px';
+  };
+
   const hide = () => {
-    dropdown.style.display = 'none';
-    dropdown.innerHTML = '';
-    const row = input.closest('.location-row');
-    if (row) row.style.overflow = '';
+    if (_locationPortalOwner !== input) return; // другой input владеет порталом
+    portal.style.display = 'none';
+    portal.innerHTML = '';
+    _locationPortalOwner = null;
   };
 
   const show = (items) => {
-    dropdown.innerHTML = '';
+    portal.innerHTML = '';
     if (!items.length) { hide(); return; }
+    _locationPortalOwner = input;
     items.forEach(({ label, value }) => {
       const item = el('div', 'location-item', escHtml(label));
       item.onmousedown = (e) => {
@@ -1528,14 +1552,14 @@ function initLocationAutocomplete(input, dropdown) {
         input.value = value;
         hide();
       };
-      dropdown.appendChild(item);
+      portal.appendChild(item);
     });
-    dropdown.style.display = 'block';
-    // .location-row имеет overflow:hidden для свайп-анимации,
-    // но это обрезает дропдаун — временно снимаем при открытом списке
-    const row = input.closest('.location-row');
-    if (row) row.style.overflow = 'visible';
+    updatePortalPos();
+    portal.style.display = 'block';
   };
+
+  // Псевдоним для keydown-обработчика ниже
+  const dropdown = portal;
 
   const CITY_TYPES = new Set([
     'city', 'town', 'village', 'hamlet', 'suburb', 'borough',
@@ -1600,7 +1624,28 @@ function initLocationAutocomplete(input, dropdown) {
 
   input.addEventListener('blur', () => {
     // Small delay so onmousedown fires first
-    setTimeout(() => { if (!selectedFromList) hide(); selectedFromList = false; }, 150);
+    setTimeout(() => {
+      if (!selectedFromList) hide();
+      selectedFromList = false;
+    }, 200);
+  });
+
+  // При скролле модала или изменении вьюпорта (клавиатура) обновляем позицию
+  input.addEventListener('focus', () => {
+    const scrollParent = input.closest('.modal-body') || input.closest('.modal-sheet');
+    if (scrollParent) {
+      scrollParent._locScroll = () => { if (_locationPortalOwner === input) updatePortalPos(); };
+      scrollParent.addEventListener('scroll', scrollParent._locScroll, { passive: true });
+    }
+    window.visualViewport && window.visualViewport.addEventListener('resize', updatePortalPos);
+  });
+
+  input.addEventListener('blur', () => {
+    const scrollParent = input.closest('.modal-body') || input.closest('.modal-sheet');
+    if (scrollParent && scrollParent._locScroll) {
+      scrollParent.removeEventListener('scroll', scrollParent._locScroll);
+    }
+    window.visualViewport && window.visualViewport.removeEventListener('resize', updatePortalPos);
   });
 
   input.addEventListener('keydown', e => {
