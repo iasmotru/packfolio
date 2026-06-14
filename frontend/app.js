@@ -1510,7 +1510,12 @@ function initLocationAutocomplete(input, dropdown) {
   let abortController = null;
   let selectedFromList = false;
 
-  const hide = () => { dropdown.style.display = 'none'; dropdown.innerHTML = ''; };
+  const hide = () => {
+    dropdown.style.display = 'none';
+    dropdown.innerHTML = '';
+    const row = input.closest('.location-row');
+    if (row) row.style.overflow = '';
+  };
 
   const show = (items) => {
     dropdown.innerHTML = '';
@@ -1526,6 +1531,10 @@ function initLocationAutocomplete(input, dropdown) {
       dropdown.appendChild(item);
     });
     dropdown.style.display = 'block';
+    // .location-row имеет overflow:hidden для свайп-анимации,
+    // но это обрезает дропдаун — временно снимаем при открытом списке
+    const row = input.closest('.location-row');
+    if (row) row.style.overflow = 'visible';
   };
 
   const CITY_TYPES = new Set([
