@@ -142,6 +142,17 @@ function canModifyDoc(doc) {
   return role === 'owner' || role === 'editor';
 }
 
+/** Может ли текущий пользователь редактировать поездку (owner или editor) */
+function canModifyTrip(tripId) {
+  const role = getTripRole(tripId);
+  return role === 'owner' || role === 'editor';
+}
+
+/** Может ли управлять доступами (только owner) */
+function canManageAccess(tripId) {
+  return getTripRole(tripId) === 'owner';
+}
+
 function wrapSwipeDelete(card, doc, afterDelete) {
   const wrap = el('div', 'swipe-wrap');
 
@@ -1900,9 +1911,11 @@ function openTripDetail(trip) {
     sheet.appendChild(body);
 
     const footer = el('div', 'modal-footer');
-    const editBtn = el('button', 'btn btn-secondary', 'Изменить');
-    editBtn.onclick = () => { Modal.close(); openTripForm(trip); };
-    footer.appendChild(editBtn);
+    if (canModifyTrip(trip.id)) {
+      const editBtn = el('button', 'btn btn-secondary', 'Изменить');
+      editBtn.onclick = () => { Modal.close(); openTripForm(trip); };
+      footer.appendChild(editBtn);
+    }
     sheet.appendChild(footer);
 
     // Загружаем документы поездки через API
@@ -2536,23 +2549,29 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   container.appendChild(el('div', 'doc-card-divider'));
 
   // ─ Поездка — одна строка ─
+  const _canEditBack = canModifyDoc(doc);
   const tripRow = el('div', 'doc-card-back-row');
   tripRow.appendChild(el('span', 'doc-card-back-row-label', 'Поездка'));
-  const tripSelect = el('select', 'select-card');
-  tripSelect.innerHTML = `<option value="">— Без поездки —</option>` +
-    State.trips.map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
-  tripSelect.onchange = async (e) => {
-    e.stopPropagation();
-    const newTripId = tripSelect.value ? parseInt(tripSelect.value) : null;
-    try {
-      await API.put(`/api/documents/${doc.id}`, { trip_id: newTripId });
-      doc.trip_id = newTripId;
-      showToast('Поездка обновлена');
-      onFrontRefresh?.();
-    } catch (err) { showToast('Ошибка: ' + err.message); }
-  };
-  tripSelect.onclick = e => e.stopPropagation();
-  tripRow.appendChild(tripSelect);
+  if (_canEditBack) {
+    const tripSelect = el('select', 'select-card');
+    tripSelect.innerHTML = `<option value="">— Без поездки —</option>` +
+      State.trips.map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
+    tripSelect.onchange = async (e) => {
+      e.stopPropagation();
+      const newTripId = tripSelect.value ? parseInt(tripSelect.value) : null;
+      try {
+        await API.put(`/api/documents/${doc.id}`, { trip_id: newTripId });
+        doc.trip_id = newTripId;
+        showToast('Поездка обновлена');
+        onFrontRefresh?.();
+      } catch (err) { showToast('Ошибка: ' + err.message); }
+    };
+    tripSelect.onclick = e => e.stopPropagation();
+    tripRow.appendChild(tripSelect);
+  } else {
+    const tripName = State.trips.find(t => t.id === doc.trip_id)?.title;
+    tripRow.appendChild(el('span', 'doc-card-back-row-value', tripName ? escHtml(tripName) : '—'));
+  }
   container.appendChild(tripRow);
 
   container.appendChild(el('div', 'doc-card-divider'));
@@ -2574,7 +2593,7 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
       showToast('Теги обновлены');
       onFrontRefresh?.();
     } catch (err) { showToast('Ошибка: ' + err.message); }
-  });
+  }, !canModifyDoc(doc));
 
   container.appendChild(el('div', 'doc-card-divider'));
 
@@ -2962,27 +2981,31 @@ function renderDocDetailBody(body, doc) {
     actions.appendChild(openBtn);
   }
 
-  const renameBtn = el('button', 'btn btn-secondary', '');
-  renameBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Переименовать`;
-  renameBtn.onclick = () => {
-    const newTitle = prompt('Новое название:', doc.title);
-    if (!newTitle || newTitle.trim() === doc.title) return;
-    API.put(`/api/documents/${doc.id}`, { title: newTitle.trim() }).then(() => {
-      doc.title = newTitle.trim();
-      const modalTitle = renameBtn.closest('.modal-sheet')?.querySelector('.modal-title');
-      if (modalTitle) modalTitle.textContent = `${info.icon} ${doc.title}`;
-      showToast('Переименовано');
-    }).catch(e => showToast('Ошибка: ' + e.message));
-  };
-  actions.appendChild(renameBtn);
+  const _canEditDetail = canModifyDoc(doc);
 
-  const replaceBtn = el('button', 'btn btn-secondary', '');
-  replaceBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Заменить`;
-  replaceBtn.onclick = () => openReplaceFileModal(doc.id, async (updated) => {
-    const fresh = updated || await API.get(`/api/documents/${doc.id}`);
-    renderDocDetailBody(body, fresh);
-  });
-  actions.appendChild(replaceBtn);
+  if (_canEditDetail) {
+    const renameBtn = el('button', 'btn btn-secondary', '');
+    renameBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Переименовать`;
+    renameBtn.onclick = () => {
+      const newTitle = prompt('Новое название:', doc.title);
+      if (!newTitle || newTitle.trim() === doc.title) return;
+      API.put(`/api/documents/${doc.id}`, { title: newTitle.trim() }).then(() => {
+        doc.title = newTitle.trim();
+        const modalTitle = renameBtn.closest('.modal-sheet')?.querySelector('.modal-title');
+        if (modalTitle) modalTitle.textContent = `${info.icon} ${doc.title}`;
+        showToast('Переименовано');
+      }).catch(e => showToast('Ошибка: ' + e.message));
+    };
+    actions.appendChild(renameBtn);
+
+    const replaceBtn = el('button', 'btn btn-secondary', '');
+    replaceBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Заменить`;
+    replaceBtn.onclick = () => openReplaceFileModal(doc.id, async (updated) => {
+      const fresh = updated || await API.get(`/api/documents/${doc.id}`);
+      renderDocDetailBody(body, fresh);
+    });
+    actions.appendChild(replaceBtn);
+  }
 
   const walletBtn = el('button', 'btn btn-secondary btn-locked', '');
   walletBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet <span class="pro-badge">Pro</span>`;
@@ -3008,6 +3031,7 @@ function renderDocDetailBody(body, doc) {
     const widgetDiv = el('div', 'widget-fields');
 
     const extractedData = doc.widget?.extracted_data || {};
+    const _roWidget = !_canEditDetail;
     visibleDetailFields.forEach(key => {
       const val = data[key];
       const row = buildWidgetFieldRow(key, val, async (newVal, extraPatch) => {
@@ -3017,7 +3041,7 @@ function renderDocDetailBody(body, doc) {
           Object.assign(doc.widget.data, patch);
           showToast('Сохранено');
         } catch (e) { showToast('Ошибка: ' + e.message); }
-      }, data, extractedData[key]);
+      }, data, extractedData[key], _roWidget);
       widgetDiv.appendChild(row);
     });
 
@@ -3029,19 +3053,26 @@ function renderDocDetailBody(body, doc) {
   const tripSection = el('div', 'section-title', 'Поездка');
   body.appendChild(tripSection);
   const tripRow = el('div', 'action-row');
-  const tripSelect = el('select', 'form-select');
-  tripSelect.style.flex = '1';
-  tripSelect.innerHTML = `<option value="">— Без поездки —</option>` +
-    State.trips.map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
-  tripSelect.onchange = async () => {
-    const newTripId = tripSelect.value ? parseInt(tripSelect.value) : null;
-    await API.put(`/api/documents/${doc.id}`, { trip_id: newTripId });
-    doc.trip_id = newTripId;
-    const idx = State.documents.findIndex(d => d.id === doc.id);
-    if (idx !== -1) State.documents[idx] = { ...State.documents[idx], trip_id: newTripId };
-    showToast('Поездка обновлена');
-  };
-  tripRow.appendChild(tripSelect);
+  if (_canEditDetail) {
+    const tripSelect = el('select', 'form-select');
+    tripSelect.style.flex = '1';
+    tripSelect.innerHTML = `<option value="">— Без поездки —</option>` +
+      State.trips.map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
+    tripSelect.onchange = async () => {
+      const newTripId = tripSelect.value ? parseInt(tripSelect.value) : null;
+      await API.put(`/api/documents/${doc.id}`, { trip_id: newTripId });
+      doc.trip_id = newTripId;
+      const idx = State.documents.findIndex(d => d.id === doc.id);
+      if (idx !== -1) State.documents[idx] = { ...State.documents[idx], trip_id: newTripId };
+      showToast('Поездка обновлена');
+    };
+    tripRow.appendChild(tripSelect);
+  } else {
+    const tripName = State.trips.find(t => t.id === doc.trip_id)?.title;
+    const tripLabel = el('span', '', tripName ? escHtml(tripName) : '— Без поездки —');
+    tripLabel.style.cssText = 'color:var(--text-secondary);font-size:15px';
+    tripRow.appendChild(tripLabel);
+  }
   body.appendChild(tripRow);
 
   // Теги
@@ -3050,33 +3081,36 @@ function renderDocDetailBody(body, doc) {
   const tagsContainer = el('div');
   tagsContainer.style.padding = '0 var(--gap)';
   body.appendChild(tagsContainer);
+  const _canEditDoc = canModifyDoc(doc);
   renderTagsEditor(tagsContainer, doc.tags || [], async (newTagIds) => {
     await API.put(`/api/documents/${doc.id}`, { tag_ids: newTagIds });
     showToast('Теги обновлены');
-  });
+  }, !_canEditDoc);
 
-  // Удаление
-  const delSection = el('div', 'section-title', '');
-  body.appendChild(delSection);
-  const delBtn = el('button', 'btn btn-danger btn-full', '🗑 Удалить документ');
-  delBtn.style.margin = '0 var(--gap)';
-  delBtn.onclick = () => {
-    showConfirmModal({
-      title: 'Удалить документ?',
-      confirmLabel: 'Удалить',
-      confirmClass: 'btn-danger',
-      onConfirm: async () => {
-        await API.delete(`/api/documents/${doc.id}`);
-        showToast('Документ удалён');
-        Modal.close();
-        await applyDocFilters();
-      },
-    });
-  };
-  body.appendChild(delBtn);
+  // Удаление — только для редакторов/владельцев
+  if (_canEditDoc) {
+    const delSection = el('div', 'section-title', '');
+    body.appendChild(delSection);
+    const delBtn = el('button', 'btn btn-danger btn-full', '🗑 Удалить документ');
+    delBtn.style.margin = '0 var(--gap)';
+    delBtn.onclick = () => {
+      showConfirmModal({
+        title: 'Удалить документ?',
+        confirmLabel: 'Удалить',
+        confirmClass: 'btn-danger',
+        onConfirm: async () => {
+          await API.delete(`/api/documents/${doc.id}`);
+          showToast('Документ удалён');
+          Modal.close();
+          await applyDocFilters();
+        },
+      });
+    };
+    body.appendChild(delBtn);
+  }
 }
 
-function buildWidgetFieldRow(key, val, onSave, allData, extractedVal) {
+function buildWidgetFieldRow(key, val, onSave, allData, extractedVal, readOnly = false) {
   const displayed = displayFieldValue(key, val, allData);
 
   const row = el('div', 'widget-field-row');
@@ -3096,6 +3130,7 @@ function buildWidgetFieldRow(key, val, onSave, allData, extractedVal) {
   const valEl = el('div', `widget-field-val${!displayed ? ' empty' : ''}`,
     displayed ? escHtml(displayed) : 'не заполнено');
   const editBtn = el('button', 'widget-field-edit', 'изм.');
+  if (readOnly) editBtn.style.display = 'none';
 
   row.appendChild(label);
   row.appendChild(valEl);
@@ -3162,7 +3197,7 @@ function buildWidgetFieldRow(key, val, onSave, allData, extractedVal) {
   return row;
 }
 
-function renderTagsEditor(container, currentTags, onUpdate) {
+function renderTagsEditor(container, currentTags, onUpdate, readOnly = false) {
   let selectedTags = [...currentTags];
 
   const render = () => {
@@ -3173,15 +3208,23 @@ function renderTagsEditor(container, currentTags, onUpdate) {
       // Системные теги — не отображаем в редакторе и не даём удалять
       if (tag.kind === 'duplicate' || tag.kind === 'old_version') return;
       const pill = el('div', 'selected-tag');
-      pill.innerHTML = `${escHtml(tag.name)} <button class="selected-tag-remove" data-id="${tag.id}">×</button>`;
-      pill.querySelector('button').onclick = () => {
-        selectedTags = selectedTags.filter(t => t.id !== tag.id);
-        onUpdate(selectedTags.map(t => t.id));
-        render();
-      };
+      if (readOnly) {
+        pill.innerHTML = escHtml(tag.name);
+        pill.style.cursor = 'default';
+      } else {
+        pill.innerHTML = `${escHtml(tag.name)} <button class="selected-tag-remove" data-id="${tag.id}">×</button>`;
+        pill.querySelector('button').onclick = () => {
+          selectedTags = selectedTags.filter(t => t.id !== tag.id);
+          onUpdate(selectedTags.map(t => t.id));
+          render();
+        };
+      }
       selectedDiv.appendChild(pill);
     });
     container.appendChild(selectedDiv);
+
+    // В режиме readOnly — не рендерим поле добавления тегов
+    if (readOnly) return;
 
     const autocomplete = el('div', 'tag-autocomplete');
     const input = el('input', 'form-input');
