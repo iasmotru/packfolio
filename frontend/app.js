@@ -2555,7 +2555,7 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
   if (_canEditBack) {
     const tripSelect = el('select', 'select-card');
     tripSelect.innerHTML = `<option value="">— Без поездки —</option>` +
-      State.trips.map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
+      State.trips.filter(t => canModifyTrip(t.id)).map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
     tripSelect.onchange = async (e) => {
       e.stopPropagation();
       const newTripId = tripSelect.value ? parseInt(tripSelect.value) : null;
@@ -3057,7 +3057,7 @@ function renderDocDetailBody(body, doc) {
     const tripSelect = el('select', 'form-select');
     tripSelect.style.flex = '1';
     tripSelect.innerHTML = `<option value="">— Без поездки —</option>` +
-      State.trips.map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
+      State.trips.filter(t => canModifyTrip(t.id)).map(t => `<option value="${t.id}" ${t.id === doc.trip_id ? 'selected' : ''}>${escHtml(t.title)}</option>`).join('');
     tripSelect.onchange = async () => {
       const newTripId = tripSelect.value ? parseInt(tripSelect.value) : null;
       await API.put(`/api/documents/${doc.id}`, { trip_id: newTripId });
@@ -3516,7 +3516,7 @@ function renderUploadStepMulti(body, docs) {
       <label class="form-label">Поездка</label>
       <select class="form-select" id="multi-trip-select">
         <option value="">— Не указывать —</option>
-        ${State.trips.map(t => `<option value="${t.id}">${escHtml(t.title)}</option>`).join('')}
+        ${State.trips.filter(t => canModifyTrip(t.id)).map(t => `<option value="${t.id}">${escHtml(t.title)}</option>`).join('')}
       </select>
     </div>
   `;
@@ -3582,7 +3582,7 @@ function renderUploadStep2(body, doc) {
       <label class="form-label">Поездка</label>
       <select class="form-select" id="doc-trip-select">
         <option value="">— Без поездки —</option>
-        ${State.trips.map(t => `<option value="${t.id}">${escHtml(t.title)}</option>`).join('')}
+        ${State.trips.filter(t => canModifyTrip(t.id)).map(t => `<option value="${t.id}">${escHtml(t.title)}</option>`).join('')}
       </select>
     </div>
 
