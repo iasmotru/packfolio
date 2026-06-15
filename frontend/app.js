@@ -3780,7 +3780,33 @@ function openProModal() {
 
     const footer = el('div', 'modal-footer');
     const proBtn = el('button', 'btn btn-primary btn-full', 'Оформить подписку');
-    proBtn.onclick = () => Modal.close();
+    proBtn.onclick = async () => {
+      proBtn.disabled = true;
+      proBtn.textContent = 'Загрузка...';
+      try {
+        const res = await API.post('/api/payments/invoice', { plan: selectedPlan });
+        Telegram.WebApp.openInvoice(res.invoice_link, async (status) => {
+          if (status === 'paid') {
+            showToast('Подписка оформлена ✅');
+            Modal.close();
+            // Обновляем данные пользователя чтобы is_pro стало true
+            const me = await API.get('/api/me');
+            State.user = Object.assign(State.user || {}, me);
+          } else if (status === 'cancelled') {
+            proBtn.disabled = false;
+            proBtn.textContent = 'Оформить подписку';
+          } else if (status === 'failed') {
+            showToast('Не удалось оплатить');
+            proBtn.disabled = false;
+            proBtn.textContent = 'Оформить подписку';
+          }
+        });
+      } catch (e) {
+        showToast('Ошибка: ' + e.message);
+        proBtn.disabled = false;
+        proBtn.textContent = 'Оформить подписку';
+      }
+    };
     footer.appendChild(proBtn);
     sheet.appendChild(footer);
   });

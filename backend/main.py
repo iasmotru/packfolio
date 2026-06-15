@@ -31,7 +31,7 @@ from models import (
     Document, DocumentTag, Tag, Trip, TripShare, User, WidgetData,
     create_tables, get_db,
 )
-from routes import calendar, documents, sharing, tags, trips, wallet_routes
+from routes import calendar, documents, payments, sharing, tags, trips, wallet_routes
 
 # ──────────────────────────────────────────────
 # Инициализация приложения
@@ -59,6 +59,7 @@ app.include_router(documents.router)
 app.include_router(calendar.router)
 app.include_router(wallet_routes.router)
 app.include_router(sharing.router)
+app.include_router(payments.router)
 
 # Статические файлы (фронтенд)
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
@@ -100,6 +101,20 @@ def on_startup():
     from models import TripShare as _TripShare
     _TripShare.__table__.create(bind=_engine, checkfirst=True)
     print("✓ Таблицы созданы / обновлены")
+
+    # Регистрируем webhook для Telegram Stars (только в prod)
+    app_url = os.getenv("APP_URL")
+    if BOT_TOKEN and app_url and ENV != "dev":
+        try:
+            webhook_url = f"{app_url.rstrip('/')}/api/payments/webhook"
+            httpx.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook",
+                json={"url": webhook_url},
+                timeout=10,
+            )
+            print(f"✓ Telegram webhook зарегистрирован: {webhook_url}")
+        except Exception as e:
+            print(f"⚠ Не удалось зарегистрировать webhook: {e}")
 
     # Авто-сид в dev-режиме
     if ENV == "dev":
