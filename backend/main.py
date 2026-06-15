@@ -11,6 +11,8 @@ import os
 from datetime import datetime
 from typing import Optional
 
+import httpx
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -114,6 +116,28 @@ def on_startup():
 # Auth endpoint
 # ──────────────────────────────────────────────
 
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
+
+def _notify_new_user(user_data: dict):
+    if not BOT_TOKEN or not ADMIN_CHAT_ID:
+        return
+    first = user_data.get("first_name", "")
+    last  = user_data.get("last_name", "")
+    username = user_data.get("username")
+    uid = user_data.get("id")
+    name = f"{first} {last}".strip() or "—"
+    mention = f"@{username}" if username else f"id{uid}"
+    text = f"👤 Новый пользователь\n{name} ({mention})"
+    try:
+        httpx.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            json={"chat_id": ADMIN_CHAT_ID, "text": text},
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+
 class AuthRequest(BaseModel):
     init_data: str
 
@@ -147,6 +171,7 @@ def auth_telegram(body: AuthRequest, db: Session = Depends(get_db)):
 
     # Создаём или обновляем пользователя
     user = db.query(User).filter(User.id == telegram_id).first()
+    is_new = not user
     if not user:
         user = User(
             id=telegram_id,
@@ -161,6 +186,9 @@ def auth_telegram(body: AuthRequest, db: Session = Depends(get_db)):
         user.last_name  = user_data.get("last_name",  user.last_name)
         user.username   = user_data.get("username",   user.username)
         db.commit()
+
+    if is_new:
+        _notify_new_user(user_data)
 
     token = create_token(telegram_id)
     return {
