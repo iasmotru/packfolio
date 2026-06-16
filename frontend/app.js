@@ -1933,6 +1933,12 @@ function openTripForm(trip = null) {
           await API.put(`/api/trips/${trip.id}`, payload);
           showToast('Поездка обновлена');
         } else {
+          const ownedCount = State.trips.filter(t => getTripRole(t.id) === 'owner').length;
+          if (ownedCount >= 5 && !State.user?.is_pro) {
+            Modal.close();
+            openProModal();
+            return;
+          }
           await API.post('/api/trips', payload);
           showToast('Поездка создана');
         }
@@ -2098,6 +2104,7 @@ async function openShareModal(trip) {
           removeBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
           // Получаем ссылку заново
           copyBtn.onclick = async () => {
+            if (!State.user?.is_pro) { Modal.close(); openProModal(); return; }
             try {
               const res = await API.post(`/api/trips/${trip.id}/invites`, { role: m.role });
               // удаляем старый pending
@@ -2144,6 +2151,7 @@ async function openShareModal(trip) {
     createBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Создать ссылку`;
     createBtn.style.cssText = 'width:100%;margin-top:8px;justify-content:center';
     createBtn.onclick = async () => {
+      if (!State.user?.is_pro) { Modal.close(); openProModal(); return; }
       try {
         const res = await API.post(`/api/trips/${trip.id}/invites`, { role: roleSelect.value });
         if (res.link) {
@@ -2591,9 +2599,9 @@ function buildDocCardBack(container, doc, onFlipBack, onFrontRefresh) {
     openReplaceFileModal(doc.id, async () => { showToast('Файл заменён'); await applyDocFilters(); });
   };
 
-  const walletBtn = el('button', 'btn btn-secondary btn-locked', '');
-  walletBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet <span class="pro-badge">Pro</span>`;
-  walletBtn.onclick = (e) => { e.stopPropagation(); openProModal(); };
+  const walletBtn = el('button', 'btn btn-secondary' + (State.user?.is_pro ? '' : ' btn-locked'), '');
+  walletBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet${State.user?.is_pro ? '' : ' <span class="pro-badge">Pro</span>'}`;
+  walletBtn.onclick = (e) => { e.stopPropagation(); State.user?.is_pro ? addToWallet(doc) : openProModal(); };
 
   actions.appendChild(openFileBtn);
   if (canModifyDoc(doc)) actions.appendChild(replaceBtn);
@@ -3061,9 +3069,9 @@ function renderDocDetailBody(body, doc) {
     actions.appendChild(replaceBtn);
   }
 
-  const walletBtn = el('button', 'btn btn-secondary btn-locked', '');
-  walletBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet <span class="pro-badge">Pro</span>`;
-  walletBtn.onclick = () => openProModal();
+  const walletBtn = el('button', 'btn btn-secondary' + (State.user?.is_pro ? '' : ' btn-locked'), '');
+  walletBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/><path d="M16 3l-4 4-4-4M12 7v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Wallet${State.user?.is_pro ? '' : ' <span class="pro-badge">Pro</span>'}`;
+  walletBtn.onclick = () => State.user?.is_pro ? addToWallet(doc) : openProModal();
   actions.appendChild(walletBtn);
 
   body.appendChild(actions);
