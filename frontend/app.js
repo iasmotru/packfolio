@@ -3749,7 +3749,7 @@ function openProModal() {
         </p>
         <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px">
           <li class="pro-feature-item"><span class="pro-feature-icon">✈️</span><span>Создание поездок без ограничений</span></li>
-          <li class="pro-feature-item"><span class="pro-feature-icon">🪪</span><span>Добавление документов в Wallet</span></li>
+          <li class="pro-feature-item"><span class="pro-feature-icon">🪪</span><span>Добавление документов в Wallet</span><span class="pro-badge" style="margin-left:6px">Скоро</span></li>
           <li class="pro-feature-item"><span class="pro-feature-icon">👥</span><span>Совместные поездки</span></li>
         </ul>
       </div>
