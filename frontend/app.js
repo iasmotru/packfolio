@@ -3739,6 +3739,7 @@ function openReplaceFileModal(docId, onDone) {
 // ── Pro Modal ──
 
 function openProModal() {
+  let selectedPlan = 'year';
   Modal.open(sheet => {
     sheet.appendChild(Modal.buildHeader('Доступно с подпиской'));
     const body = el('div', 'modal-body');
@@ -3747,58 +3748,64 @@ function openProModal() {
         <p style="color:var(--text-hint);font-size:14px;margin-bottom:16px">
           Оформите подписку Pro, чтобы открыть новые возможности Packfolio:
         </p>
-        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px">
+        <ul style="list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:6px">
           <li class="pro-feature-item"><span class="pro-feature-icon">✈️</span><span>Создание поездок без ограничений</span></li>
           <li class="pro-feature-item"><span class="pro-feature-icon">🪪</span><span>Добавление документов в Wallet</span><span class="pro-badge" style="margin-left:6px">Скоро</span></li>
           <li class="pro-feature-item"><span class="pro-feature-icon">👥</span><span>Совместные поездки</span></li>
         </ul>
+        <div class="pro-plans">
+          <label class="pro-plan" data-plan="month">
+            <input type="radio" name="modal-plan" value="month" style="display:none">
+            <div class="pro-plan-name">Месяц</div>
+            <div class="pro-plan-price">⭐ 250</div>
+          </label>
+          <label class="pro-plan active" data-plan="year">
+            <input type="radio" name="modal-plan" value="year" style="display:none" checked>
+            <div class="pro-plan-name">Год <span class="pro-badge">−30%</span></div>
+            <div class="pro-plan-price">⭐ 2100</div>
+          </label>
+        </div>
       </div>
     `;
     sheet.appendChild(body);
 
-    const footer = el('div', 'modal-footer');
-    footer.style.flexDirection = 'column';
-    footer.style.gap = '8px';
-
-    const makePayBtn = (plan, label) => {
-      const btn = el('button', 'btn btn-primary btn-full', label);
-      btn.onclick = async () => {
-        footer.querySelectorAll('button').forEach(b => { b.disabled = true; });
-        btn.textContent = 'Загрузка...';
-        try {
-          await API.post('/api/payments/invoice', { plan });
-          footer.querySelectorAll('button').forEach(b => { b.disabled = false; });
-          btn.textContent = 'Проверить чат с ботом';
-          btn.onclick = () => Telegram.WebApp.close();
-          showToast('Инвойс отправлен — оплати в чате с ботом');
-          const onResume = async () => {
-            Telegram.WebApp.offEvent('activated', onResume);
-            const me = await API.get('/api/me');
-            if (me && me.is_pro) {
-              State.user = Object.assign(State.user || {}, me);
-              showToast('Подписка оформлена ✅');
-              Modal.close();
-              renderProfilePage();
-            }
-          };
-          Telegram.WebApp.onEvent('activated', onResume);
-        } catch (e) {
-          showToast('Ошибка: ' + e.message);
-          footer.querySelectorAll('button').forEach(b => { b.disabled = false; });
-          btn.innerHTML = label;
-        }
+    body.querySelectorAll('.pro-plan').forEach(pl => {
+      pl.onclick = () => {
+        body.querySelectorAll('.pro-plan').forEach(p => p.classList.remove('active'));
+        pl.classList.add('active');
+        selectedPlan = pl.dataset.plan;
       };
-      return btn;
+    });
+
+    const footer = el('div', 'modal-footer');
+    const proBtn = el('button', 'btn btn-primary btn-full', 'Оплатить');
+    proBtn.onclick = async () => {
+      proBtn.disabled = true;
+      proBtn.textContent = 'Загрузка...';
+      try {
+        await API.post('/api/payments/invoice', { plan: selectedPlan });
+        proBtn.textContent = 'Проверить чат с ботом';
+        proBtn.disabled = false;
+        proBtn.onclick = () => Telegram.WebApp.close();
+        showToast('Инвойс отправлен — оплати в чате с ботом');
+        const onResume = async () => {
+          Telegram.WebApp.offEvent('activated', onResume);
+          const me = await API.get('/api/me');
+          if (me && me.is_pro) {
+            State.user = Object.assign(State.user || {}, me);
+            showToast('Подписка оформлена ✅');
+            Modal.close();
+            renderProfilePage();
+          }
+        };
+        Telegram.WebApp.onEvent('activated', onResume);
+      } catch (e) {
+        showToast('Ошибка: ' + e.message);
+        proBtn.disabled = false;
+        proBtn.textContent = 'Оплатить';
+      }
     };
-
-    footer.appendChild(makePayBtn('month', '⭐ 250 / месяц'));
-    const yearBtn = makePayBtn('year', '⭐ 2100 / год');
-    yearBtn.style.position = 'relative';
-    const badge = el('span', 'pro-badge', '−30%');
-    badge.style.cssText = 'position:absolute;top:-8px;right:12px;';
-    yearBtn.appendChild(badge);
-    footer.appendChild(yearBtn);
-
+    footer.appendChild(proBtn);
     sheet.appendChild(footer);
   });
 }
