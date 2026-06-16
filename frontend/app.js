@@ -3800,6 +3800,7 @@ function openProModal() {
             State.user = Object.assign(State.user || {}, me);
             showToast('Подписка оформлена ✅');
             Modal.close();
+            renderProfilePage();
           }
         };
         Telegram.WebApp.onEvent('activated', onResume);
@@ -4321,6 +4322,7 @@ function renderProfilePage() {
           if (me && me.is_pro) {
             State.user = Object.assign(State.user || {}, me);
             showToast('Подписка оформлена ✅');
+            renderProfilePage();
           }
         };
         Telegram.WebApp.onEvent('activated', onResume);
