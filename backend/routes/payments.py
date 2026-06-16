@@ -39,15 +39,18 @@ def create_invoice(
 
     payload = f"{user_id}:{body.plan}"
 
+    # sendInvoice отправляет платёжную карточку прямо в чат пользователя с ботом.
+    # openInvoice / openTelegramLink из Mini App контекста блокируются Telegram.
     resp = httpx.post(
-        f"https://api.telegram.org/bot{BOT_TOKEN}/createInvoiceLink",
+        f"https://api.telegram.org/bot{BOT_TOKEN}/sendInvoice",
         json={
-            "title":         "Packfolio Pro",
-            "description":   plan["label"],
-            "payload":       payload,
-            "currency":      "XTR",          # Telegram Stars
-            "prices":        [{"label": "Подписка", "amount": plan["amount"]}],
-            "provider_token": "",            # для Stars — пустая строка
+            "chat_id":        user_id,
+            "title":          "Packfolio Pro",
+            "description":    plan["label"],
+            "payload":        payload,
+            "currency":       "XTR",
+            "prices":         [{"label": "Подписка", "amount": plan["amount"]}],
+            "provider_token": "",
         },
         timeout=10,
     )
@@ -55,7 +58,7 @@ def create_invoice(
     if not data.get("ok"):
         raise HTTPException(status_code=502, detail=data.get("description", "Ошибка Telegram"))
 
-    return {"invoice_link": data["result"]}
+    return {"sent": True}
 
 
 @router.post("/webhook")

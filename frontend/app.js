@@ -3784,9 +3784,15 @@ function openProModal() {
       proBtn.disabled = true;
       proBtn.textContent = 'Загрузка...';
       try {
-        const res = await API.post('/api/payments/invoice', { plan: selectedPlan });
+        await API.post('/api/payments/invoice', { plan: selectedPlan });
 
-        // Когда Mini App снова становится видимым — проверяем оплату
+        // Бот прислал инвойс в чат — просим пользователя перейти туда
+        proBtn.textContent = 'Проверить чат с ботом';
+        proBtn.disabled = false;
+        proBtn.onclick = () => Telegram.WebApp.close();
+        showToast('Инвойс отправлен — оплати в чате с ботом');
+
+        // Когда Mini App снова откроется — проверяем оплату
         const onResume = async () => {
           Telegram.WebApp.offEvent('activated', onResume);
           const me = await API.get('/api/me');
@@ -3794,15 +3800,9 @@ function openProModal() {
             State.user = Object.assign(State.user || {}, me);
             showToast('Подписка оформлена ✅');
             Modal.close();
-          } else {
-            proBtn.disabled = false;
-            proBtn.textContent = 'Оформить подписку';
           }
         };
         Telegram.WebApp.onEvent('activated', onResume);
-
-        // Открываем инвойс как обычную Telegram-ссылку
-        Telegram.WebApp.openTelegramLink(res.invoice_link);
       } catch (e) {
         showToast('Ошибка: ' + e.message);
         proBtn.disabled = false;
