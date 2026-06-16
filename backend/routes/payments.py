@@ -15,16 +15,18 @@ from models import User, get_db
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
-INVOICE_DESCRIPTION = (
-    "✈️ Поездки без ограничений\n"
-    "🪪 Добавление документов в Wallet (скоро)\n"
-    "👥 Совместные поездки"
-)
-
 PLANS = {
     "month": {"amount": 250,  "days": 30,  "title": "Packfolio Pro — 1 месяц"},
     "year":  {"amount": 2100, "days": 365, "title": "Packfolio Pro — 1 год"},
 }
+
+INVOICE_DESCRIPTION = "Подписка Packfolio Pro"
+
+FEATURES_MESSAGE = (
+    "✈️ Поездки без ограничений\n"
+    "🪪 Добавление документов в Wallet (скоро)\n"
+    "👥 Совместные поездки"
+)
 
 
 class InvoiceRequest(BaseModel):
@@ -45,8 +47,13 @@ def create_invoice(
 
     payload = f"{user_id}:{body.plan}"
 
-    # sendInvoice отправляет платёжную карточку прямо в чат пользователя с ботом.
-    # openInvoice / openTelegramLink из Mini App контекста блокируются Telegram.
+    # Сначала отправляем текст с фичами (description инвойса не поддерживает переносы строк)
+    httpx.post(
+        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+        json={"chat_id": user_id, "text": f"<b>{plan['title']}</b>\n\n{FEATURES_MESSAGE}", "parse_mode": "HTML"},
+        timeout=10,
+    )
+
     resp = httpx.post(
         f"https://api.telegram.org/bot{BOT_TOKEN}/sendInvoice",
         json={
