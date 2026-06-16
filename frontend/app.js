@@ -4306,7 +4306,30 @@ function renderProfilePage() {
 
     const payBtn = el('button', 'btn btn-primary btn-full', 'Оплатить');
     payBtn.style.marginTop = '16px';
-    payBtn.onclick = () => showToast('Оплата временно недоступна');
+    payBtn.onclick = async () => {
+      payBtn.disabled = true;
+      payBtn.textContent = 'Загрузка...';
+      try {
+        await API.post('/api/payments/invoice', { plan: selectedPlan });
+        payBtn.textContent = 'Проверить чат с ботом';
+        payBtn.disabled = false;
+        payBtn.onclick = () => Telegram.WebApp.close();
+        showToast('Инвойс отправлен — оплати в чате с ботом');
+        const onResume = async () => {
+          Telegram.WebApp.offEvent('activated', onResume);
+          const me = await API.get('/api/me');
+          if (me && me.is_pro) {
+            State.user = Object.assign(State.user || {}, me);
+            showToast('Подписка оформлена ✅');
+          }
+        };
+        Telegram.WebApp.onEvent('activated', onResume);
+      } catch (e) {
+        showToast('Ошибка: ' + e.message);
+        payBtn.disabled = false;
+        payBtn.textContent = 'Оплатить';
+      }
+    };
     proCard.appendChild(payBtn);
   }
 
