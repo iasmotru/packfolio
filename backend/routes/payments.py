@@ -15,9 +15,15 @@ from models import User, get_db
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
+INVOICE_DESCRIPTION = (
+    "✈️ Поездки без ограничений\n"
+    "🪪 Добавление документов в Wallet (скоро)\n"
+    "👥 Совместные поездки"
+)
+
 PLANS = {
-    "month": {"amount": 250,  "days": 30,  "label": "Packfolio Pro — 1 месяц"},
-    "year":  {"amount": 2100, "days": 365, "label": "Packfolio Pro — 1 год"},
+    "month": {"amount": 250,  "days": 30,  "title": "Packfolio Pro — 1 месяц"},
+    "year":  {"amount": 2100, "days": 365, "title": "Packfolio Pro — 1 год"},
 }
 
 
@@ -45,8 +51,8 @@ def create_invoice(
         f"https://api.telegram.org/bot{BOT_TOKEN}/sendInvoice",
         json={
             "chat_id":        user_id,
-            "title":          "Packfolio Pro",
-            "description":    plan["label"],
+            "title":          plan["title"],
+            "description":    INVOICE_DESCRIPTION,
             "payload":        payload,
             "currency":       "XTR",
             "prices":         [{"label": "Подписка", "amount": plan["amount"]}],
