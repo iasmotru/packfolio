@@ -4276,7 +4276,7 @@ function renderProfilePage() {
       <p class="profile-pro-desc">Оформите подписку, чтобы открыть все возможности Packfolio:</p>
       <ul class="pro-feature-list">
         <li class="pro-feature-item"><span class="pro-feature-icon">✈️</span><span>Поездки без ограничений</span></li>
-        <li class="pro-feature-item"><span class="pro-feature-icon">🪪</span><span>Добавление документов в Wallet</span></li>
+        <li class="pro-feature-item"><span class="pro-feature-icon">🪪</span><span>Добавление документов в Wallet</span><span class="pro-badge" style="margin-left:6px">Скоро</span></li>
         <li class="pro-feature-item"><span class="pro-feature-icon">👥</span><span>Совместные поездки</span></li>
       </ul>
       <div class="pro-plans" id="profile-pro-plans">
