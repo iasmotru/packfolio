@@ -3785,22 +3785,24 @@ function openProModal() {
       proBtn.textContent = 'Загрузка...';
       try {
         const res = await API.post('/api/payments/invoice', { plan: selectedPlan });
-        Telegram.WebApp.openInvoice(res.invoice_link, async (status) => {
-          if (status === 'paid') {
+
+        // Когда Mini App снова становится видимым — проверяем оплату
+        const onResume = async () => {
+          Telegram.WebApp.offEvent('activated', onResume);
+          const me = await API.get('/api/me');
+          if (me && me.is_pro) {
+            State.user = Object.assign(State.user || {}, me);
             showToast('Подписка оформлена ✅');
             Modal.close();
-            // Обновляем данные пользователя чтобы is_pro стало true
-            const me = await API.get('/api/me');
-            State.user = Object.assign(State.user || {}, me);
-          } else if (status === 'cancelled') {
-            proBtn.disabled = false;
-            proBtn.textContent = 'Оформить подписку';
-          } else if (status === 'failed') {
-            showToast('Не удалось оплатить');
+          } else {
             proBtn.disabled = false;
             proBtn.textContent = 'Оформить подписку';
           }
-        });
+        };
+        Telegram.WebApp.onEvent('activated', onResume);
+
+        // Открываем инвойс как обычную Telegram-ссылку
+        Telegram.WebApp.openTelegramLink(res.invoice_link);
       } catch (e) {
         showToast('Ошибка: ' + e.message);
         proBtn.disabled = false;
