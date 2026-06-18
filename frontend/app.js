@@ -94,6 +94,7 @@ const API = {
 
   get:    (path)        => API.request('GET',    path),
   post:   (path, body)  => API.request('POST',   path, body),
+  patch:  (path, body)  => API.request('PATCH',  path, body),
   put:    (path, body)  => API.request('PUT',    path, body),
   delete: (path)        => API.request('DELETE', path),
   postForm: (path, fd)  => API.request('POST',   path, fd, true),
@@ -1389,6 +1390,16 @@ function applyTripFilters(listEl) {
     const role = trip.access_role || 'owner';
     const roleLabel = role === 'editor' ? 'редактор' : role === 'reader' ? 'читатель' : null;
 
+    const editReqStatus = trip.edit_request_status || null;
+    let requestBtnHtml = '';
+    if (role === 'reader') {
+      if (editReqStatus === 'pending') {
+        requestBtnHtml = `<button class="btn btn-secondary trip-req-editor-btn" disabled style="margin-top:10px;width:100%;justify-content:center;opacity:.5">Запрос отправлен</button>`;
+      } else {
+        requestBtnHtml = `<button class="btn btn-secondary trip-req-editor-btn" style="margin-top:10px;width:100%;justify-content:center">Запросить доступ редактора</button>`;
+      }
+    }
+
     card.innerHTML = `
       <div class="trip-card-header">
         <div class="trip-card-title">${escHtml(trip.title)}</div>
@@ -1407,12 +1418,18 @@ function applyTripFilters(listEl) {
         ${(role !== 'owner' || trip.is_shared) ? `<span class="trip-meta-chip">👥 Совместная</span>` : ''}
       </div>
       ${trip.note ? `<div class="trip-card-note">${escHtml(trip.note)}</div>` : ''}
+      ${requestBtnHtml}
     `;
     card.onclick = () => openTripDetail(trip);
     // Кнопка «Поделиться» — отдельный обработчик, не открывает детали
     const shareBtn = card.querySelector('.trip-share-btn');
     if (shareBtn) {
       shareBtn.onclick = (e) => { e.stopPropagation(); openShareModal(trip); };
+    }
+    // Кнопка «Запросить доступ редактора» (только для читателей)
+    const reqEditorBtn = card.querySelector('.trip-req-editor-btn');
+    if (reqEditorBtn && !reqEditorBtn.disabled) {
+      reqEditorBtn.onclick = (e) => { e.stopPropagation(); _openRequestEditorModal(trip); };
     }
     listEl.appendChild(card);
   });
@@ -2207,6 +2224,14 @@ async function handleInvite(token) {
         const res = await API.post(`/api/invites/${token}/accept`, {});
         await loadAllData();
         State.loaded = true;
+
+        // Редактор без подписки — предложить выбор
+        if (info.role === 'editor' && !State.user?.is_pro) {
+          Modal.close();
+          _openEditorUpgradeModal(res.share_id, info.trip_title);
+          return;
+        }
+
         Modal.close();
         App.navigate('trips', true);
         showToast(`Вы теперь ${roleLabel} в поездке «${escHtml(info.trip_title)}»`);
@@ -2225,6 +2250,229 @@ async function handleInvite(token) {
     body.appendChild(declineBtn);
     sheet.appendChild(body);
   }, { full: false });
+}
+
+function _openEditorUpgradeModal(shareId, tripTitle) {
+  Modal.open(sheet => {
+    sheet.appendChild(Modal.buildHeader('Доступно с подпиской'));
+    const body = el('div', 'modal-body');
+    body.innerHTML = `
+      <div style="padding:4px 0 8px">
+        <p style="font-size:14px;margin-bottom:8px">
+          Для редактирования нужна подписка Packfolio Pro.
+        </p>
+        <p style="color:var(--text-hint);font-size:14px;margin-bottom:16px">
+          Вы можете пользоваться читательским доступом к поездке без подписки.
+        </p>
+        <ul style="list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:6px">
+          <li class="pro-feature-item"><span class="pro-feature-icon">✈️</span><span>Создание поездок без ограничений</span></li>
+          <li class="pro-feature-item"><span class="pro-feature-icon">🪪</span><span>Добавление документов в Wallet</span><span class="pro-badge" style="margin-left:6px">Скоро</span></li>
+          <li class="pro-feature-item"><span class="pro-feature-icon">👥</span><span>Совместные поездки</span></li>
+        </ul>
+      </div>
+    `;
+    sheet.appendChild(body);
+
+    const footer = el('div', 'modal-footer');
+    footer.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+
+    const subBtn = el('button', 'btn btn-primary btn-full', 'Оформить подписку');
+    subBtn.onclick = () => {
+      Modal.close();
+      openProModal('Оформить подписку');
+    };
+
+    const readerBtn = el('button', 'btn btn-secondary btn-full', 'Продолжить как читатель');
+    readerBtn.onclick = async () => {
+      readerBtn.disabled = true;
+      readerBtn.textContent = '...';
+      try {
+        await API.patch(`/api/shares/${shareId}/downgrade-to-reader`, {});
+        await loadAllData();
+        State.loaded = true;
+        Modal.close();
+        App.navigate('trips', true);
+        showToast(`Вы читатель в поездке «${escHtml(tripTitle)}»`);
+      } catch (e) {
+        readerBtn.disabled = false;
+        readerBtn.textContent = 'Продолжить как читатель';
+        showToast('Ошибка: ' + e.message);
+      }
+    };
+
+    footer.appendChild(subBtn);
+    footer.appendChild(readerBtn);
+    sheet.appendChild(footer);
+  });
+}
+
+// Читатель запрашивает доступ редактора
+function _openRequestEditorModal(trip) {
+  Modal.open(sheet => {
+    sheet.appendChild(Modal.buildHeader('Доступно с подпиской'));
+    const body = el('div', 'modal-body');
+    body.innerHTML = `
+      <div style="padding:4px 0 8px">
+        <p style="font-size:14px;margin-bottom:8px">
+          Для редактирования нужна подписка Packfolio Pro.
+        </p>
+        <p style="color:var(--text-hint);font-size:14px;margin-bottom:16px">
+          Вы можете продолжить пользоваться читательским доступом к поездке без подписки.
+        </p>
+        <ul style="list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:6px">
+          <li class="pro-feature-item"><span class="pro-feature-icon">✈️</span><span>Создание поездок без ограничений</span></li>
+          <li class="pro-feature-item"><span class="pro-feature-icon">🪪</span><span>Добавление документов в Wallet</span><span class="pro-badge" style="margin-left:6px">Скоро</span></li>
+          <li class="pro-feature-item"><span class="pro-feature-icon">👥</span><span>Совместные поездки</span></li>
+        </ul>
+      </div>
+    `;
+    sheet.appendChild(body);
+
+    const footer = el('div', 'modal-footer');
+    footer.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+
+    const reqBtn = el('button', 'btn btn-primary btn-full', 'Запросить доступ');
+    reqBtn.onclick = async () => {
+      reqBtn.disabled = true;
+      reqBtn.textContent = 'Отправка...';
+      try {
+        await API.post(`/api/trips/${trip.id}/request-editor`, {});
+        trip.edit_request_status = 'pending';
+        Modal.close();
+        showToast('Запрос отправлен владельцу поездки');
+        renderTripsPage();
+      } catch (e) {
+        reqBtn.disabled = false;
+        reqBtn.textContent = 'Запросить доступ';
+        showToast('Ошибка: ' + e.message);
+      }
+    };
+
+    const stayBtn = el('button', 'btn btn-secondary btn-full', 'Продолжить как читатель');
+    stayBtn.onclick = () => Modal.close();
+
+    footer.appendChild(reqBtn);
+    footer.appendChild(stayBtn);
+    sheet.appendChild(footer);
+  });
+}
+
+// Владелец видит запрос на редактирование при открытии приложения
+function _showOwnerEditRequestModal(req) {
+  Modal.open(sheet => {
+    sheet.appendChild(Modal.buildHeader('Запрос доступа'));
+    const body = el('div', 'modal-body');
+    body.style.paddingTop = '16px';
+    body.innerHTML = `
+      <div style="text-align:center;padding:0 8px 16px">
+        <div style="font-size:32px;margin-bottom:12px">✏️</div>
+        <div style="font-size:15px;line-height:1.5">
+          <strong>${escHtml(req.member_name)}</strong> запрашивает доступ на редактирование поездки
+          <strong>«${escHtml(req.trip_title)}»</strong>
+        </div>
+      </div>
+    `;
+    sheet.appendChild(body);
+
+    const footer = el('div', 'modal-footer');
+    footer.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+
+    const acceptBtn = el('button', 'btn btn-primary btn-full', 'Принять');
+    acceptBtn.onclick = async () => {
+      acceptBtn.disabled = true;
+      acceptBtn.textContent = '...';
+      try {
+        await API.post(`/api/trips/${req.trip_id}/edit-requests/${req.share_id}/accept`, {});
+        Modal.close();
+        showToast(`Доступ выдан — ${escHtml(req.member_name)} стал редактором`);
+        await loadAllData();
+        renderTripsPage();
+      } catch (e) {
+        acceptBtn.disabled = false;
+        acceptBtn.textContent = 'Принять';
+        showToast('Ошибка: ' + e.message);
+      }
+    };
+
+    const declineBtn = el('button', 'btn btn-secondary btn-full', 'Отклонить');
+    declineBtn.onclick = async () => {
+      declineBtn.disabled = true;
+      declineBtn.textContent = '...';
+      try {
+        await API.post(`/api/trips/${req.trip_id}/edit-requests/${req.share_id}/decline`, {});
+        Modal.close();
+        showToast('Запрос отклонён');
+        await loadAllData();
+        renderTripsPage();
+      } catch (e) {
+        declineBtn.disabled = false;
+        declineBtn.textContent = 'Отклонить';
+        showToast('Ошибка: ' + e.message);
+      }
+    };
+
+    footer.appendChild(acceptBtn);
+    footer.appendChild(declineBtn);
+    sheet.appendChild(footer);
+  });
+}
+
+// Читатель видит, что запрос принят, и выбирает: остаться читателем или купить Pro
+function _showEditorGrantedModal(trip) {
+  Modal.open(sheet => {
+    sheet.appendChild(Modal.buildHeader('Доступно с подпиской'));
+    const body = el('div', 'modal-body');
+    body.innerHTML = `
+      <div style="padding:4px 0 8px">
+        <p style="font-size:14px;margin-bottom:8px">
+          Для редактирования нужна подписка Packfolio Pro.
+        </p>
+        <p style="color:var(--text-hint);font-size:14px;margin-bottom:16px">
+          Вы можете пользоваться читательским доступом к поездке без подписки.
+        </p>
+        <ul style="list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:6px">
+          <li class="pro-feature-item"><span class="pro-feature-icon">✈️</span><span>Создание поездок без ограничений</span></li>
+          <li class="pro-feature-item"><span class="pro-feature-icon">🪪</span><span>Добавление документов в Wallet</span><span class="pro-badge" style="margin-left:6px">Скоро</span></li>
+          <li class="pro-feature-item"><span class="pro-feature-icon">👥</span><span>Совместные поездки</span></li>
+        </ul>
+      </div>
+    `;
+    sheet.appendChild(body);
+
+    const footer = el('div', 'modal-footer');
+    footer.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+
+    const subBtn = el('button', 'btn btn-primary btn-full', 'Оформить подписку');
+    subBtn.onclick = () => {
+      API.patch(`/api/shares/${trip.share_id}/dismiss-edit-request`, {}).catch(() => {});
+      trip.edit_request_status = null;
+      Modal.close();
+      openProModal('Оформить подписку');
+    };
+
+    const readerBtn = el('button', 'btn btn-secondary btn-full', 'Продолжить как читатель');
+    readerBtn.onclick = async () => {
+      readerBtn.disabled = true;
+      readerBtn.textContent = '...';
+      try {
+        await API.patch(`/api/shares/${trip.share_id}/downgrade-to-reader`, {});
+        trip.edit_request_status = null;
+        trip.access_role = 'reader';
+        Modal.close();
+        showToast('Вы продолжаете как читатель');
+        await loadAllData();
+        renderTripsPage();
+      } catch (e) {
+        readerBtn.disabled = false;
+        readerBtn.textContent = 'Продолжить как читатель';
+        showToast('Ошибка: ' + e.message);
+      }
+    };
+
+    footer.appendChild(subBtn);
+    footer.appendChild(readerBtn);
+    sheet.appendChild(footer);
+  });
 }
 
 // ── ДОКУМЕНТЫ ──
@@ -3738,10 +3986,10 @@ function openReplaceFileModal(docId, onDone) {
 
 // ── Pro Modal ──
 
-function openProModal() {
+function openProModal(title = 'Доступно с подпиской') {
   let selectedPlan = 'year';
   Modal.open(sheet => {
-    sheet.appendChild(Modal.buildHeader('Доступно с подпиской'));
+    sheet.appendChild(Modal.buildHeader(title));
     const body = el('div', 'modal-body');
     body.innerHTML = `
       <div style="padding:4px 0 8px">
@@ -4470,6 +4718,34 @@ const App = {
       const token = State.pendingInviteToken;
       State.pendingInviteToken = null;
       handleInvite(token);
+      return;
+    }
+
+    // Для владельца: показываем ожидающие запросы на редакторский доступ
+    const pendingEditorReqs = [];
+    State.trips.forEach(t => {
+      (t.pending_editor_requests || []).forEach(req => {
+        pendingEditorReqs.push({ ...req, trip_id: t.id, trip_title: t.title });
+      });
+    });
+    if (pendingEditorReqs.length) {
+      _showOwnerEditRequestModal(pendingEditorReqs[0]);
+      return;
+    }
+
+    // Для читателя: запрос принят → предложить подписку или остаться читателем
+    const acceptedTrip = State.trips.find(t => t.edit_request_status === 'accepted');
+    if (acceptedTrip) {
+      _showEditorGrantedModal(acceptedTrip);
+      return;
+    }
+
+    // Для читателя: запрос отклонён → тост и сброс
+    const declinedTrip = State.trips.find(t => t.edit_request_status === 'declined');
+    if (declinedTrip) {
+      API.patch(`/api/shares/${declinedTrip.share_id}/dismiss-edit-request`, {}).catch(() => {});
+      declinedTrip.edit_request_status = null;
+      showToast(`Владелец отклонил ваш запрос на редактирование поездки «${declinedTrip.title}»`);
     }
   },
 

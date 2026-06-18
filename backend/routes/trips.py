@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth import get_current_user_id
-from models import Trip, TripShare, get_db
+from models import Trip, TripShare, User, get_db
 
 router = APIRouter(prefix="/api/trips", tags=["trips"])
 
@@ -71,13 +71,30 @@ def list_trips(
         TripShare.accepted == True,
     ).all()
     owned_ids = {t.id for t in owned}
-    shares_map = {s.trip_id: s.role for s in shares}
-    shared_ids = set(shares_map.keys()) - owned_ids
+    shares_obj_map = {s.trip_id: s for s in shares}
+    shared_ids = set(shares_obj_map.keys()) - owned_ids
 
     shared = db.query(Trip).filter(Trip.id.in_(shared_ids)).all() if shared_ids else []
 
-    def _trip_dict(trip: Trip, role: str) -> dict:
-        return {
+    # Ожидающие запросы на редакторский доступ для поездок владельца
+    owned_trip_ids = list(owned_ids)
+    pending_reqs = db.query(TripShare).filter(
+        TripShare.trip_id.in_(owned_trip_ids),
+        TripShare.accepted == True,
+        TripShare.edit_request_status == 'pending',
+    ).all() if owned_trip_ids else []
+    pending_map: dict = {}
+    for req in pending_reqs:
+        member = db.query(User).filter(User.id == req.member_id).first()
+        pending_map.setdefault(req.trip_id, []).append({
+            "share_id":        req.id,
+            "member_id":       req.member_id,
+            "member_name":     f"{member.first_name} {member.last_name or ''}".strip() if member else "Пользователь",
+            "member_username": member.username if member else None,
+        })
+
+    def _trip_dict(trip: Trip, role: str, share: TripShare = None) -> dict:
+        d = {
             "id":          trip.id,
             "user_id":     trip.user_id,
             "title":       trip.title,
@@ -89,9 +106,15 @@ def list_trips(
             "created_at":  trip.created_at.isoformat() if trip.created_at else None,
             "access_role": role,
         }
+        if share:
+            d["share_id"]            = share.id
+            d["edit_request_status"] = share.edit_request_status
+        else:
+            d["pending_editor_requests"] = pending_map.get(trip.id, [])
+        return d
 
     result = [_trip_dict(t, "owner") for t in owned]
-    result += [_trip_dict(t, shares_map[t.id]) for t in shared]
+    result += [_trip_dict(t, shares_obj_map[t.id].role, shares_obj_map[t.id]) for t in shared]
     result.sort(key=lambda x: x["created_at"] or "", reverse=True)
     return result
 

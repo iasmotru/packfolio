@@ -245,4 +245,144 @@ async def accept_invite(
     member_name = f"{member.first_name} {member.last_name or ''}".strip() if member else "Пользователь"
     await _notify_owner(share.owner_id, member_name, trip.title)
 
-    return {"ok": True, "trip_id": share.trip_id, "role": share.role}
+    return {"ok": True, "trip_id": share.trip_id, "role": share.role, "share_id": share.id}
+
+
+# ─── PATCH /api/shares/{share_id}/downgrade-to-reader ────────────────────────
+
+@router.patch("/api/shares/{share_id}/downgrade-to-reader")
+def downgrade_to_reader(
+    share_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Участник понижает свою роль с editor до reader (сам, без участия владельца)."""
+    share = db.query(TripShare).filter(
+        TripShare.id == share_id,
+        TripShare.member_id == user_id,
+        TripShare.accepted == True,
+    ).first()
+    if not share:
+        raise HTTPException(404, "Участие не найдено")
+    share.role = "reader"
+    share.edit_request_status = None
+    db.commit()
+    return {"ok": True}
+
+
+# ─── POST /api/trips/{trip_id}/request-editor ─────────────────────────────────
+
+@router.post("/api/trips/{trip_id}/request-editor")
+def request_editor_access(
+    trip_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Читатель запрашивает доступ на редактирование."""
+    share = db.query(TripShare).filter(
+        TripShare.trip_id == trip_id,
+        TripShare.member_id == user_id,
+        TripShare.accepted == True,
+        TripShare.role == "reader",
+    ).first()
+    if not share:
+        raise HTTPException(404, "Вы не являетесь читателем этой поездки")
+
+    share.edit_request_status = "pending"
+    db.commit()
+
+    trip  = db.query(Trip).filter(Trip.id == trip_id).first()
+    owner = db.query(User).filter(User.id == share.owner_id).first()
+    member = db.query(User).filter(User.id == user_id).first()
+    member_name = f"{member.first_name} {member.last_name or ''}".strip() if member else "Пользователь"
+    trip_title  = trip.title if trip else ""
+
+    _send_tg(
+        share.owner_id,
+        f"✏️ {member_name} запрашивает доступ на редактирование поездки «{trip_title}»",
+    )
+    return {"ok": True}
+
+
+# ─── POST /api/trips/{trip_id}/edit-requests/{share_id}/accept ───────────────
+
+@router.post("/api/trips/{trip_id}/edit-requests/{share_id}/accept")
+def accept_editor_request(
+    trip_id:  int,
+    share_id: int,
+    user_id:  int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Владелец принимает запрос на редактирование."""
+    trip = db.query(Trip).filter(Trip.id == trip_id, Trip.user_id == user_id).first()
+    if not trip:
+        raise HTTPException(404, "Поездка не найдена или нет прав")
+    share = db.query(TripShare).filter(
+        TripShare.id == share_id, TripShare.trip_id == trip_id,
+    ).first()
+    if not share:
+        raise HTTPException(404, "Запрос не найден")
+
+    share.role               = "editor"
+    share.edit_request_status = "accepted"
+    db.commit()
+
+    owner  = db.query(User).filter(User.id == user_id).first()
+    owner_name = f"{owner.first_name} {owner.last_name or ''}".strip() if owner else "Владелец"
+    _send_tg(
+        share.member_id,
+        f"✅ {owner_name} выдал(а) Ваш доступ на редактирование поездки «{trip.title}»",
+    )
+    return {"ok": True}
+
+
+# ─── POST /api/trips/{trip_id}/edit-requests/{share_id}/decline ──────────────
+
+@router.post("/api/trips/{trip_id}/edit-requests/{share_id}/decline")
+def decline_editor_request(
+    trip_id:  int,
+    share_id: int,
+    user_id:  int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Владелец отклоняет запрос на редактирование."""
+    trip = db.query(Trip).filter(Trip.id == trip_id, Trip.user_id == user_id).first()
+    if not trip:
+        raise HTTPException(404, "Поездка не найдена или нет прав")
+    share = db.query(TripShare).filter(
+        TripShare.id == share_id, TripShare.trip_id == trip_id,
+    ).first()
+    if not share:
+        raise HTTPException(404, "Запрос не найден")
+
+    share.edit_request_status = "declined"
+    db.commit()
+
+    owner  = db.query(User).filter(User.id == user_id).first()
+    owner_name = f"{owner.first_name} {owner.last_name or ''}".strip() if owner else "Владелец"
+    _send_tg(
+        share.member_id,
+        f"❌ {owner_name} отклонил(а) Ваш запрос доступа на редактирование поездки «{trip.title}»",
+    )
+    return {"ok": True}
+
+
+# ─── PATCH /api/shares/{share_id}/dismiss-edit-request ───────────────────────
+
+@router.patch("/api/shares/{share_id}/dismiss-edit-request")
+def dismiss_edit_request(
+    share_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Читатель подтверждает, что видел ответ (сбрасывает статус)."""
+    share = db.query(TripShare).filter(
+        TripShare.id == share_id,
+        TripShare.member_id == user_id,
+        TripShare.accepted == True,
+    ).first()
+    if not share:
+        raise HTTPException(404, "Участие не найдено")
+    share.edit_request_status = None
+    db.commit()
+    return {"ok": True}

@@ -155,9 +155,10 @@ class TripShare(Base):
     owner_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
     member_id    = Column(Integer, ForeignKey("users.id"), nullable=True)   # NULL пока не принято
     role         = Column(String(16), nullable=False, default="reader")     # "reader" | "editor"
-    invite_token = Column(String(64), unique=True, nullable=False)
-    accepted     = Column(Boolean, default=False, nullable=False, server_default="0")
-    created_at   = Column(DateTime, default=datetime.utcnow)
+    invite_token        = Column(String(64), unique=True, nullable=False)
+    accepted            = Column(Boolean, default=False, nullable=False, server_default="0")
+    edit_request_status = Column(String(16), nullable=True)   # None | 'pending' | 'accepted' | 'declined'
+    created_at          = Column(DateTime, default=datetime.utcnow)
 
     trip   = relationship("Trip",  foreign_keys=[trip_id])
     owner  = relationship("User",  foreign_keys=[owner_id])

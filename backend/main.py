@@ -100,6 +100,11 @@ def on_startup():
     # Создаём таблицу trip_shares если её нет (create_all с checkfirst)
     from models import TripShare as _TripShare
     _TripShare.__table__.create(bind=_engine, checkfirst=True)
+    with _engine.connect() as conn:
+        share_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(trip_shares)")).fetchall()]
+        if "edit_request_status" not in share_cols:
+            conn.execute(text("ALTER TABLE trip_shares ADD COLUMN edit_request_status VARCHAR(16)"))
+            conn.commit()
     print("✓ Таблицы созданы / обновлены")
 
     # Регистрируем webhook для Telegram Stars (только в prod)
