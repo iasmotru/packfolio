@@ -10,10 +10,9 @@ python-multipart==0.0.18
 pypdf==5.1.0
 python-dateutil==2.9.0.post0
 
-# OCR (опционально, включить ENABLE_OCR=1)
-# Раскомментировать при необходимости:
-# pytesseract==0.3.13
-# Pillow==11.0.0
+# OCR
+pytesseract==0.3.13
+Pillow==11.0.0
 
 # Apple Wallet (опционально, нужны сертификаты)
 # cryptography уже входит в python-jose[cryptography]
