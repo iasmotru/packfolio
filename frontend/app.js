@@ -1393,10 +1393,11 @@ function applyTripFilters(listEl) {
     const editReqStatus = trip.edit_request_status || null;
     let requestBtnHtml = '';
     if (role === 'reader') {
+      const _reqBtnStyle = 'height:28px;padding:0 10px;border-radius:8px;background:rgba(70,77,245,0.12);border:1px solid rgba(70,77,245,0.25);color:var(--accent);font-size:11px;font-weight:600;font-family:Onest,sans-serif;cursor:pointer;white-space:nowrap;margin-top:8px;';
       if (editReqStatus === 'pending') {
-        requestBtnHtml = `<button class="btn btn-secondary trip-req-editor-btn" disabled style="margin-top:8px;font-size:12px;padding:6px 10px;justify-content:center;opacity:.5">Запрос отправлен</button>`;
+        requestBtnHtml = `<button class="trip-req-editor-btn" disabled style="${_reqBtnStyle}opacity:.5;cursor:default">Запрос отправлен</button>`;
       } else {
-        requestBtnHtml = `<button class="btn btn-secondary trip-req-editor-btn" style="margin-top:8px;font-size:12px;padding:6px 10px;justify-content:center">Запросить доступ редактора</button>`;
+        requestBtnHtml = `<button class="trip-req-editor-btn" style="${_reqBtnStyle}">Запросить доступ редактора</button>`;
       }
     }
 
