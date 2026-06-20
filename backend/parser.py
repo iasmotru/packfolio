@@ -2000,11 +2000,13 @@ def parse_document(file_path: str, mime_type: str) -> Tuple[str, float, List[Dic
     Для всех остальных документов список из одного элемента.
     """
     text = extract_text(file_path, mime_type)
+    print(f"[parser] mime={mime_type} text_len={len(text)} text_preview={repr(text[:300])}")
 
     if not text.strip():
         return "UNKNOWN", 0.0, [{}]
 
     doc_type, confidence = determine_doc_type(text)
+    print(f"[parser] raw doc_type={doc_type} conf={confidence:.2f} is_omio={_is_omio(text)}")
 
     # Omio билеты часто содержат "booking" и попадают в HOTEL_BOOKING — переопределяем
     if _is_omio(text) and doc_type != "TRAIN_TICKET":
