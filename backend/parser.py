@@ -127,7 +127,7 @@ DOC_PATTERNS: Dict[str, list] = {
         r"\bstation\b",
         r"\bplatform\b",
         r"\bdeutsche bahn\b",
-        r"\b(db|sncf|eurostar|thalys|italo|trenitalia)\b",
+        r"\b(db|sncf|eurostar|thalys|italo|trenitalia|omio)\b",
         r"\bwagon\b",
         r"\bcoach\b.*\bseat\b",
         # Русские паттерны (РЖД / ФПК)
@@ -151,7 +151,7 @@ DOC_PATTERNS: Dict[str, list] = {
         r"\bbus\s*no\b",
         r"\bseat\s*:\s*\d+",
         r"\bdepart\s*:",
-        r"\b(omio|rede.?expressos|national\s+express|ouibus|blablabus)\b",
+        r"\b(rede.?expressos|national\s+express|ouibus|blablabus)\b",
         r"\bticket\s+no\b",
         r"\bpassenger\s+information\b",
         r"\bestimated\s+time\s+of\s+arrival\b",
@@ -1436,6 +1436,12 @@ def extract_ticket_data(text: str, doc_type: str) -> Dict[str, Any]:
 
     # ── Специфика TRAIN_TICKET / BUS_TICKET ───────────────────────────────
     else:
+        # ── Omio: кошелёк/скриншот Apple Wallet ────────────────────────
+        if _is_omio(text):
+            omio = _extract_omio_data(text)
+            data.update({k: v for k, v in omio.items() if v is not None})
+            return data
+
         dep_kw = r"departure|departs?|отправление|отправл|вылет|from\s*date|\bstd\b"
         arr_kw = r"arrival|arrives?|прибытие|прибыт|прилёт|to\s*date|\bsta\b"
         dep_date = find_date_after_keyword(text, dep_kw)
@@ -1642,6 +1648,80 @@ def _parse_dmy_date(raw: str) -> str:
     if m:
         return f"{m.group(3)}-{m.group(2)}-{m.group(1)}"
     return raw
+
+
+def _is_omio(text: str) -> bool:
+    return bool(re.search(r'\bomio\b', text, re.IGNORECASE))
+
+
+def _extract_omio_data(text: str) -> Dict[str, Any]:
+    """
+    Парсит билеты Omio (Apple Wallet passes / скриншоты).
+    Формат OCR: station names в ALL CAPS, "BOOKING REFERENCE\n<digits>",
+    "DATE Sep 23, 2025", "PASSENGER\nFirstname Lastname".
+    """
+    data: Dict[str, Any] = {}
+
+    # Booking reference (чисто числовой, 7–13 цифр).
+    # В Apple Wallet пасс: "PASSENGER BOOKING REFERENCE\nMariia Martinovich 2624346803"
+    # — номер брони на той же строке, что и имя, поэтому ищем через [^\n]*?
+    pnr_m = re.search(r'booking\s*reference[^\n]*\n[^\n]*?(\d{7,13})', text, re.IGNORECASE)
+    if pnr_m:
+        data['pnr'] = pnr_m.group(1)
+
+    # Passenger name: "PASSENGER BOOKING REFERENCE\nMariia Martinovich ..."
+    # Require a newline so we skip the label line; name must be Title Case (not ALL CAPS)
+    pax_m = re.search(
+        r'passenger[^\n]*\n\s*([A-Z][a-z][a-zA-Z]*(?:\s+[A-Z][a-z][a-zA-Z]*)+)',
+        text, re.IGNORECASE,
+    )
+    if pax_m:
+        data['passengers'] = pax_m.group(1).strip()
+
+    # Date: "DATE Sep 23, 2025" (label on same or next line)
+    date_m = re.search(
+        r'\bDATE[:\s]*\n?\s*([A-Za-z]{3}\.?\s+\d{1,2},?\s+\d{4})',
+        text, re.IGNORECASE,
+    )
+    if date_m:
+        d = normalize_date_str(date_m.group(1).strip())
+        if d:
+            data['departure_date'] = d
+            data['arrival_date'] = d
+    if not data.get('departure_date'):
+        dates = find_dates(text)
+        if dates:
+            data['departure_date'] = dates[0]
+            data['arrival_date'] = dates[0]
+
+    # Station names: ALL-CAPS sequences (Omio wallet format)
+    # E.g. "VARENNA-ESINO", "SANTA MARGHERITA LI..."
+    _OMIO_SKIP = {
+        'DATE', 'PASSENGER', 'BOOKING', 'REFERENCE', 'LIVE', 'UPDATES',
+        'OMIO', 'JOURNEY', 'TRACKER', 'TR', 'IN', 'THE', 'APP',
+    }
+    station_re = re.compile(r'\b([A-Z][A-Z\-]{2,}(?:[ \t]+[A-Z][A-Z\-]+){0,4})\b')
+    candidates = []
+    for m in station_re.finditer(text):
+        val = m.group(1).strip()
+        if any(w in _OMIO_SKIP for w in val.split()):
+            continue
+        if len(val) >= 4:
+            candidates.append(val)
+
+    if candidates and not data.get('departure_place'):
+        data['departure_place'] = candidates[0].title()
+    if len(candidates) >= 2 and not data.get('arrival_place'):
+        data['arrival_place'] = candidates[1].title()
+
+    # Times: first = departure, second = arrival
+    times = find_times(text)
+    if times and not data.get('departure_time'):
+        data['departure_time'] = times[0]
+    if len(times) >= 2 and not data.get('arrival_time'):
+        data['arrival_time'] = times[1]
+
+    return data
 
 
 def _extract_generic_bus_legs(pages: List[str]) -> List[Dict[str, Any]]:
@@ -1925,6 +2005,12 @@ def parse_document(file_path: str, mime_type: str) -> Tuple[str, float, List[Dic
         return "UNKNOWN", 0.0, [{}]
 
     doc_type, confidence = determine_doc_type(text)
+
+    # Omio билеты часто содержат "booking" и попадают в HOTEL_BOOKING — переопределяем
+    if _is_omio(text) and doc_type != "TRAIN_TICKET":
+        doc_type = "TRAIN_TICKET"
+        confidence = max(confidence, 0.75)
+
     extracted = extract_widget_data(text, doc_type)
 
     if doc_type == "FLIGHT_TICKET":
