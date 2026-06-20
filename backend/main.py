@@ -348,18 +348,6 @@ def dev_seed(db: Session = Depends(get_db)):
 
 
 # ──────────────────────────────────────────────
-# Temp admin stats (remove after use)
-# ──────────────────────────────────────────────
-
-@app.get("/api/admin/users")
-def admin_users(token: str = "", db: Session = Depends(get_db)):
-    if token != BOT_TOKEN:
-        raise HTTPException(status_code=403)
-    users = db.query(User).order_by(User.created_at.asc()).all()
-    return [{"id": u.id, "username": u.username, "first_name": u.first_name, "created_at": str(u.created_at)} for u in users]
-
-
-# ──────────────────────────────────────────────
 # Health check
 # ──────────────────────────────────────────────
 
